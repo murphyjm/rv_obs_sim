@@ -141,8 +141,8 @@ class RVObsSim(RVSystem):
         
         rv_tot = np.zeros(len(self.obs_dates))
 
-        for planet in self.planets.values():
-            rv_tot += rv_drive(self.obs_dates, planet.orbel)
+        for planet in self.rvsystem.rvplanets.values():
+            rv_tot += rv_drive(self.obs_dates, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
         
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2))
 
