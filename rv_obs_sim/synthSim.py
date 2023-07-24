@@ -104,24 +104,6 @@ class RVObsSim(RVSystem):
         except:
             pass
 
-    '''
-    Don't use this function for a synthetic simulation. Use for resampling.
-    '''
-    # def load_data(self, data_path, read_csv_kwargs):
-    
-    #     try:
-    #         df = pd.read_csv(data_path, **read_csv_kwargs)
-    #     except FileNotFoundError:
-    #         print(f"Warning: Data path {data_path} does not exist.")
-    #         return
-
-    #     assert set(['time', 'mnvel','errvel', 'tel']).issubset(df.columns), "Data must have columns: 'time', 'mnvel', 'errvel', 'tel'."
-
-    #     self.time = df.time.values
-    #     self.mnvel_obs = df.mnvel.values
-    #     self.errvel_obs = df.errvel.values
-    #     self.tel = df.tel.values
-
     def get_obs_dates(self) -> object:
         '''
         Pick which dates the observations will be taken
