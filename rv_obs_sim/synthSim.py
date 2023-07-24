@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from radvel.kepler import rv_drive
 
 class RVPlanet:
@@ -147,3 +146,6 @@ class RVObsSim(RVSystem):
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2))
         
         return (self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name)
+    
+
+    
