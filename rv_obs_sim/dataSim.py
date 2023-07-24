@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from radvel.utils import bintels
 
 class DataSim:
 
@@ -26,7 +27,15 @@ class DataSim:
             return
 
         assert set(['time', 'mnvel','errvel', 'tel']).issubset(df.columns), "Data must have columns: 'time', 'mnvel', 'errvel', 'tel'."
-        self.data = df
+        
+        data = pd.DataFrame()
+
+        bintime, binmnvel, binerrvel, bintel = bintels(df.time, df.mnvel, df.errvel, df.tel, binsize=0.1)
+        data['time'] = bintime
+        data['mnvel'] = binmnvel
+        data['errvel'] = binerrvel
+        data['tel'] = bintel
+        self.data = data
 
         if self.obs_start is None:
             self.obs_start = np.min(self.data.time) - 1
@@ -37,13 +46,10 @@ class DataSim:
         '''
         Resample the data according to the specified number of observations, cadence, and start/end dates.
         '''
-        df = pd.DataFrame(columns=['time', 'mnvel', 'errvel', 'tel'])
-        inds = -1 * np.ones(self.nobs) # Try to meet the number of observations requested, but may not be possible.
-
         mask = self.data['time'] > self.obs_start
         mask &= self.data['time'] < self.obs_end
         mask &= np.array([1] + [np.ediff1d(self.data['time']) >= self.min_obs_cadence], dtype=bool)
         mask &= np.arange(len(self.data)) < self.nobs
 
-        self.df_resampled = df[mask]
+        self.df_resampled = self.data[mask]
         return self.df_resampled
