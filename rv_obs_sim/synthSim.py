@@ -67,7 +67,7 @@ class SynthSim(RVStar):
     '''
 
     def __init__(self, star:RVStar, 
-                 tel_name:str='HIRES', 
+                 tel_name:str='hires_j', 
                  rv_meas_err:float=2, 
                  tel_jitter:float=0, 
                  astro_jitter:float=0,
@@ -94,22 +94,22 @@ class SynthSim(RVStar):
     def set_nobs(self, nobs:int) -> None:
         self.nobs = nobs
         try:
-            if self.obs_cadence * self.nobs > self.N_DATE_GRID:
-                self.N_DATE_GRID = round((self.obs_cadence * self.nobs) * 10, -3) # Round to nearest 1000
+            if self.min_obs_cadence * self.nobs > self.N_DATE_GRID:
+                self.N_DATE_GRID = round((self.min_obs_cadence * self.nobs) * 10, -3) # Round to nearest 1000
         except:
             pass
 
-    def set_obs_cadence(self, obs_cadence:int) -> None:
+    def set_min_obs_cadence(self, min_obs_cadence:int) -> None:
         '''
         Set the observing cadence goal in units of Number of calendar nights between observations.
         e.g.,
-        obs_cadence =  1 -> Nightly observations
-        obs_cadence = 10 -> 1 observation every 10 days
+        min_obs_cadence =  1 -> Nightly observations
+        min_obs_cadence = 10 -> 1 observation every 10 days
         '''
-        self.obs_cadence = obs_cadence
+        self.min_obs_cadence = min_obs_cadence
         try:
-            if self.obs_cadence * self.nobs > self.N_DATE_GRID:
-                self.N_DATE_GRID = round((self.obs_cadence * self.nobs) * 10, -3) # Round to nearest 1000
+            if self.min_obs_cadence * self.nobs > self.N_DATE_GRID:
+                self.N_DATE_GRID = round((self.min_obs_cadence * self.nobs) * 10, -3) # Round to nearest 1000
         except:
             pass
 
@@ -117,8 +117,13 @@ class SynthSim(RVStar):
         '''
         Pick which dates the observations will be taken
         '''
+        #self.min_obs_cadence = round(self.min_obs_cadence)
+
         date_grid = np.arange(self.N_DATE_GRID) + self.obs_bjd_start
-        obs_dates = date_grid[::self.obs_cadence]
+        if self.min_obs_cadence == 0:
+            obs_dates = date_grid
+        else:
+            obs_dates = date_grid[::self.min_obs_cadence]
         
         # This is where you would apply masks for: (1) observability, (2) bad weather, (3) telescope schedule, etc.
         mask = np.ones(len(obs_dates), dtype=bool)
@@ -134,9 +139,9 @@ class SynthSim(RVStar):
         for planet in self.star.planets.values():
             rv_tot += rv_drive(self.obs_dates, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
         
-        rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2))
+        rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2), size=len(rv_tot))
 
-        rv_tot += self.obs_dates * self.dvdt
+        rv_tot += self.obs_dates * self.star.dvdt
         
         df = pd.DataFrame()
         df['time'], df['mnvel'], df['errvel'], df['tel'] = self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name
