@@ -7,7 +7,7 @@ class RVPlanet:
         self.pl_letter = pl_letter
         self.orbel = orbel
         if self.orbel is not None:
-            self.p, self.tp, self.e, self.omega, self.k = self.orbel
+            self.set_orbel(self.orbel)
     
     def __str__(self) -> str:
         str_out  = '-----'
@@ -20,13 +20,12 @@ class RVPlanet:
         str_out += '-----'
         return str_out
         
-    def set_orbel(self, orbel:tuple, bjd_offset:float=0) -> None:
+    def set_orbel(self, orbel:tuple) -> None:
         '''
         Note: Tp is time of periastron passage **not** time of transit.
         '''
         self.orbel = orbel
         self.p, self.tp, self.e, self.omega, self.k = self.orbel
-        self.bjd_offset = self.bjd_offset
 
 class RVStar:
 
@@ -45,9 +44,6 @@ class RVStar:
 
     def add_planet(self, rvplanet:RVPlanet) -> None:
         self.planets[rvplanet.pl_letter] = rvplanet
-
-        planet_b_bjd_offset = self.planets['b'].bjd_offset
-        assert [planet.bjd_offset == planet_b_bjd_offset for planet in self.planets.values()], 'All planets must have same bjd offset for Tc and/or Tperi values.'
 
     def pop_planet(self, pl_letter:str) -> RVPlanet:
         return self.planets.pop(pl_letter)
@@ -71,7 +67,12 @@ class RVObsSim(RVSystem):
     Can only use one telescope for now.
     '''
 
-    def __init__(self, rvsystem:RVSystem, tel_name:str='HIRES', rv_meas_err:float=2, tel_jitter:float=0, astro_jitter:float=0) -> None:
+    def __init__(self, rvsystem:RVSystem, 
+                 tel_name:str='HIRES', 
+                 rv_meas_err:float=2, 
+                 tel_jitter:float=0, 
+                 astro_jitter:float=0,
+                 obs_bjd_start:float=2457000) -> None:
         
         self.rvsystem = rvsystem
         self.tel_name = tel_name
@@ -79,8 +80,7 @@ class RVObsSim(RVSystem):
         self.tel_jitter = tel_jitter
         self.astro_jitter = astro_jitter
 
-        # Assumes that bjd_offset is the same for each planet
-        self.bjd_offset = self.rvsystem.rvplanets['b'].bjd_offset
+        self.obs_bjd_start = obs_bjd_start
 
         self.seed = 42
         np.random.seed(self.seed)
@@ -118,7 +118,7 @@ class RVObsSim(RVSystem):
         '''
         Pick which dates the observations will be taken
         '''
-        date_grid = np.arange(self.N_DATE_GRID) + self.bjd_offset
+        date_grid = np.arange(self.N_DATE_GRID) + self.obs_bjd_start
         obs_dates = date_grid[::self.obs_cadence]
         
         # This is where you would apply masks for: (1) observability, (2) bad weather, (3) telescope schedule, etc.
