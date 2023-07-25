@@ -20,7 +20,7 @@ class RVPlanet:
         str_out += '-----'
         return str_out
         
-    def set_orbel(self, orbel:tuple, bjd_offset:float=2457000) -> None:
+    def set_orbel(self, orbel:tuple, bjd_offset:float=0) -> None:
         self.orbel = orbel
         self.p, self.tp, self.e, self.omega, self.k = self.orbel
         self.bjd_offset = self.bjd_offset
