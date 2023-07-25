@@ -20,9 +20,10 @@ class RVPlanet:
         str_out += '-----'
         return str_out
         
-    def set_orbel(self, orbel:tuple) -> None:
+    def set_orbel(self, orbel:tuple, bjd_offset:float=2457000) -> None:
         self.orbel = orbel
         self.p, self.tp, self.e, self.omega, self.k = self.orbel
+        self.bjd_offset = self.bjd_offset
 
 class RVStar:
 
@@ -41,6 +42,9 @@ class RVStar:
 
     def add_planet(self, rvplanet:RVPlanet) -> None:
         self.planets[rvplanet.pl_letter] = rvplanet
+
+        planet_b_bjd_offset = self.planets['b'].bjd_offset
+        assert [planet.bjd_offset == planet_b_bjd_offset for planet in self.planets.values()], 'All planets must have same bjd offset for Tc and/or Tperi values.'
 
     def pop_planet(self, pl_letter:str) -> RVPlanet:
         return self.planets.pop(pl_letter)
@@ -71,6 +75,9 @@ class RVObsSim(RVSystem):
         self.rv_meas_err = rv_meas_err
         self.tel_jitter = tel_jitter
         self.astro_jitter = astro_jitter
+
+        # Assumes that bjd_offset is the same for each planet
+        self.bjd_offset = self.rvsystem.rvplanets['b'].bjd_offset
 
         self.seed = 42
         np.random.seed(self.seed)
@@ -108,7 +115,7 @@ class RVObsSim(RVSystem):
         '''
         Pick which dates the observations will be taken
         '''
-        date_grid = np.arange(self.N_DATE_GRID)
+        date_grid = np.arange(self.N_DATE_GRID) + self.bjd_offset
         obs_dates = date_grid[::self.obs_cadence]
         
         # This is where you would apply masks for: (1) observability, (2) bad weather, (3) telescope schedule, etc.
