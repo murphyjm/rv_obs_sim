@@ -21,6 +21,9 @@ class RVPlanet:
         return str_out
         
     def set_orbel(self, orbel:tuple, bjd_offset:float=0) -> None:
+        '''
+        Note: Tp is time of periastron passage **not** time of transit.
+        '''
         self.orbel = orbel
         self.p, self.tp, self.e, self.omega, self.k = self.orbel
         self.bjd_offset = self.bjd_offset
