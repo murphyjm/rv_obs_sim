@@ -34,6 +34,7 @@ class RVStar:
         self.sys_name = sys_name
         self.mstar = None
         self.planets = {}
+        self.dvdt = 0
 
     def __str__(self) -> str:
         str_out = '-----'
@@ -54,8 +55,11 @@ class RVStar:
     
     def get_mstar(self) -> float:
         return self.mstar
+    
+    def set_dvdt(self, dvdt:float) -> float:
+        self.dvdt = dvdt
 
-class RVObsSim(RVStar):
+class SynthSim(RVStar):
     '''
     Simulate synthetic RV observations. 
 
@@ -131,6 +135,8 @@ class RVObsSim(RVStar):
             rv_tot += rv_drive(self.obs_dates, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
         
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2))
+
+        rv_tot += self.obs_dates * self.dvdt
         
         df = pd.DataFrame()
         df['time'], df['mnvel'], df['errvel'], df['tel'] = self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name
