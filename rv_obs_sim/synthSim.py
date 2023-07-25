@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from radvel.kepler import rv_drive
 
 class RVPlanet:
@@ -54,27 +55,21 @@ class RVStar:
     def get_mstar(self) -> float:
         return self.mstar
 
-class RVSystem(RVStar):
-    
-    def __init__(self, rvstar:RVStar) -> None:
-        self.rvstar = rvstar
-        self.rvplanets = self.rvstar.planets
-
-class RVObsSim(RVSystem):
+class RVObsSim(RVStar):
     '''
     Simulate synthetic RV observations. 
 
     Can only use one telescope for now.
     '''
 
-    def __init__(self, rvsystem:RVSystem, 
+    def __init__(self, star:RVStar, 
                  tel_name:str='HIRES', 
                  rv_meas_err:float=2, 
                  tel_jitter:float=0, 
                  astro_jitter:float=0,
                  obs_bjd_start:float=2457000) -> None:
         
-        self.rvsystem = rvsystem
+        self.star = star
         self.tel_name = tel_name
         self.rv_meas_err = rv_meas_err
         self.tel_jitter = tel_jitter
@@ -132,12 +127,15 @@ class RVObsSim(RVSystem):
         
         rv_tot = np.zeros(len(self.obs_dates))
 
-        for planet in self.rvsystem.rvplanets.values():
+        for planet in self.star.planets.values():
             rv_tot += rv_drive(self.obs_dates, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
         
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2))
         
-        return (self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name)
+        df = pd.DataFrame()
+        df['time'], df['mnvel'], df['errvel'], df['tel'] = self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name
+        self.data = df
+        return df
     
 
     
