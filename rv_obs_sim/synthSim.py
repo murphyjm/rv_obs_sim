@@ -56,7 +56,7 @@ class RVStar:
     def get_mstar(self) -> float:
         return self.mstar
     
-    def set_dvdt(self, dvdt:float) -> float:
+    def set_dvdt(self, dvdt:float):
         self.dvdt = dvdt
 
 class SynthSim(RVStar):
@@ -147,6 +147,3 @@ class SynthSim(RVStar):
         df['time'], df['mnvel'], df['errvel'], df['tel'] = self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name
         self.data = df
         return df
-    
-
-    
