@@ -2,10 +2,9 @@ import numpy as np
 import radvel
 from tqdm import tqdm
 
-
 class SynthSimGrid:
     
-    def __init__(self, moc_grid, nrv_grid, base_config_file, fit_config_file, astro_jitter=0, tel_jitter=0, errvel_scale=2, max_baseline=1000) -> None:
+    def __init__(self, moc_grid, nrv_grid, base_config_file, fit_config_file, astro_jitter=0, tel_jitter=0, errvel_scale=2, max_baseline=3650) -> None:
 
         self.moc_grid = moc_grid
         self.nrv_grid = nrv_grid
@@ -19,21 +18,14 @@ class SynthSimGrid:
 
         self.max_baseline = max_baseline
 
-        # self.__N_DATE_GRID =  # Some arbitrarily large number, but should be larger than max(self.moc_grid) * max(self.nrv_grid) > self.N_DATE_GRID:
-        # if np.max(self.moc_grid) * np.max(self.nrv_grid) > self.__N_DATE_GRID:
-        #     self.__N_DATE_GRID = round((np.max(self.moc_grid) * np.max(self.nrv_grid)) * 10, -2) # Round to nearest 100
-
-        self.__parent_synth_data_grid = self.__get_parent_synth_data_grid(self)
-
-    def __fit_and_get_map_params(self, mask, verbose=False):
-        fit_config_file_obj, post = radvel.utils.initialize_posterior(self.fit_config_file)
+    def __fit_and_get_k_maps(self, post, mask, planet_letter_keys, verbose=False):
         
         post.likelihood.x = self.time_grid[mask]
         post.likelihood.y = self.mnvel_grid[mask]
         post.likelihood.yerr = self.errvel_grid[mask]
 
         post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
-        return np.array([post.params[f'k{i}'] for i in fit_config_file_obj.planet_letters.keys()])
+        return np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
 
     def __set_parent_synth_data_grid(self):
         '''
@@ -58,9 +50,9 @@ class SynthSimGrid:
             orbel = (p, tp, ecc, omega, k)
             rv_tot += radvel.kepler.rv_drive(time_grid, orbel)
 
-        # Add background trend if applicable
-        rv_tot += (time_grid - base_config_file_obj.time_base) * base_config_file_obj.params['dvdt'].value
-        rv_tot += (time_grid - base_config_file_obj.time_base)**2 * base_config_file_obj.params['curv'].value
+        # Add background trend if applicable. Need to input correct dvdt and curv values in config file.
+        rv_tot += (time_grid - base_config_file_obj.time_base) * base_post.params['dvdt'].value
+        rv_tot += (time_grid - base_config_file_obj.time_base)**2 * base_post.params['curv'].value
 
         # Add random noise
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2), size=len(rv_tot))
@@ -77,14 +69,14 @@ class SynthSimGrid:
 
         ksim_over_ktruth = np.ones((len(self.moc_grid), len(self.nrv_grid), fit_post.model.num_planets))
         for k in fit_config_file_obj.planet_letters.keys():
-            ksim_over_ktruth[:, :, k - 1] /= self.base_post.params[f'k{k}']
+            ksim_over_ktruth[:, :, k - 1] /= self.base_post.params[f'k{k}'].value
         
         i = 0
         for moc in tqdm(self.moc_grid, disable=disable_progress_bar):
             for j, nrv in enumerate(self.nrv_grid):
                 mask = (self.time_grid - self.config_file_obj.time_base) % moc == 0
                 mask &= (self.time_grid - self.config_file_obj.time_base) / moc < nrv
-                k_maps = self.__fit_and_get_map_params(mask, verbose=False)
+                k_maps = self.__fit_and_get_k_maps(fit_post, mask, list(fit_config_file_obj.planet_letters.keys()), verbose=False)
 
                 for k in range(fit_post.model.num_planets):
                     ksim_over_ktruth[i, j, k] *= k_maps[k]
@@ -92,5 +84,3 @@ class SynthSimGrid:
             i += 1
         
         return ksim_over_ktruth
-
-                
