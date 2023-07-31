@@ -5,63 +5,92 @@ from tqdm import tqdm
 
 class SynthSimGrid:
     
-    def __init__(self, nrv_grid, moc_grid, config_file, bjd_offset:float=0, astro_jitter=0, tel_jitter=0) -> None:
+    def __init__(self, moc_grid, nrv_grid, base_config_file, fit_config_file, astro_jitter=0, tel_jitter=0, errvel_scale=2, max_baseline=1000) -> None:
 
-        self.nrv_grid = nrv_grid
         self.moc_grid = moc_grid
-        self.config_file = config_file
-        self.bjd_offset = bjd_offset
+        self.nrv_grid = nrv_grid
+
+        self.base_config_file = base_config_file
+        self.fit_config_file = fit_config_file
+
         self.astro_jitter = astro_jitter
         self.tel_jitter = tel_jitter
+        self.errvel_scale = errvel_scale
 
-        self.__N_DATE_GRID = 1000 # Some arbitrarily large number, but should be larger than max(self.moc_grid) * max(self.nrv_grid) > self.N_DATE_GRID:
-        if np.max(self.moc_grid) * np.max(self.nrv_grid) > self.__N_DATE_GRID:
-            self.__N_DATE_GRID = round((np.max(self.moc_grid) * np.max(self.nrv_grid)) * 10, -2) # Round to nearest 100
+        self.max_baseline = max_baseline
+
+        # self.__N_DATE_GRID =  # Some arbitrarily large number, but should be larger than max(self.moc_grid) * max(self.nrv_grid) > self.N_DATE_GRID:
+        # if np.max(self.moc_grid) * np.max(self.nrv_grid) > self.__N_DATE_GRID:
+        #     self.__N_DATE_GRID = round((np.max(self.moc_grid) * np.max(self.nrv_grid)) * 10, -2) # Round to nearest 100
 
         self.__parent_synth_data_grid = self.__get_parent_synth_data_grid(self)
 
-    def __fit_and_get_map_params(self, config_file, verbose=False):
-        _, post = radvel.utils.initialize_posterior(config_file)
-        post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
-        self.map_params = post.likelihood.params
+    def __fit_and_get_map_params(self, mask, verbose=False):
+        fit_config_file_obj, post = radvel.utils.initialize_posterior(self.fit_config_file)
         
-        return post.likelihood.params
+        post.likelihood.x = self.time_grid[mask]
+        post.likelihood.y = self.mnvel_grid[mask]
+        post.likelihood.yerr = self.errvel_grid[mask]
 
-    def __get_parent_synth_data_grid(self):
+        post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
+        return np.array([post.params[f'k{i}'] for i in fit_config_file_obj.planet_letters.keys()])
+
+    def __set_parent_synth_data_grid(self):
         '''
         Should only have to generate the synthetic RVs once, but on a large grid, and then you can just 
         resample them later based on the number of RVs requested and the MOC.
         '''
-        config_file_obj, init_post = radvel.utils.initialize_posterior(self.config_file)
-        date_grid = np.arange(self.__N_DATE_GRID) + config_file_obj.time_base
+        base_config_file_obj, base_post = radvel.utils.initialize_posterior(self.base_config_file)
+        time_grid = np.arange(self.max_baseline) + base_config_file_obj.time_base
 
-        rv_tot = np.zeros(len(date_grid))
+        rv_tot = np.zeros(len(time_grid))
 
-        for pl_ind in config_file_obj.planet_letters.keys(): # Need to input correct K-amplitudes in config file.
+        for pl_ind in base_config_file_obj.planet_letters.keys(): # Need to input correct K-amplitudes in config file.
             
             # Extract orbit parameters
-            p = init_post.params[f'per{pl_ind}'].value
-            tc = init_post.params[f'tc{pl_ind}'].value
-            ecc = init_post.params[f'ecc{pl_ind}'].value
-            omega = init_post.params[f'omega{pl_ind}'].value
+            p = base_post.params[f'per{pl_ind}'].value
+            tc = base_post.params[f'tc{pl_ind}'].value
+            ecc = base_post.params[f'ecc{pl_ind}'].value
+            omega = base_post.params[f'omega{pl_ind}'].value
             tp = radvel.orbit.timetrans_to_timeperi(tc, p, ecc, omega)
-            k = init_post.params[f'k{pl_ind}'].value
+            k = base_post.params[f'k{pl_ind}'].value
             
             orbel = (p, tp, ecc, omega, k)
-            rv_tot += radvel.kepler.rv_drive(self.obs_dates, orbel)
+            rv_tot += radvel.kepler.rv_drive(time_grid, orbel)
 
         # Add background trend if applicable
-        rv_tot += (self.obs_dates - config_file_obj.time_base) * config_file_obj.params['dvdt'].value
-        rv_tot += (self.obs_dates - config_file_obj.time_base)**2 * config_file_obj.params['curv'].value
+        rv_tot += (time_grid - base_config_file_obj.time_base) * base_config_file_obj.params['dvdt'].value
+        rv_tot += (time_grid - base_config_file_obj.time_base)**2 * base_config_file_obj.params['curv'].value
 
         # Add random noise
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2), size=len(rv_tot))
 
-        pass
-        
-    def generate_fit_grid(self, disable_progress_bar=False):
+        self.base_post = base_post
+        self.base_config_file_obj = base_config_file_obj
 
+        self.time_grid, self.mnvel_grid, self.errvel_grid = time_grid, rv_tot, self.errvel_scale * np.ones(len(rv_tot))
+        
+    def get_ksim_over_ktruth_grid(self, disable_progress_bar=False):
+
+        self.__set_parent_synth_data_grid()
+        fit_config_file_obj, fit_post = radvel.utils.initialize_posterior(self.fit_config_file) 
+
+        ksim_over_ktruth = np.ones((len(self.moc_grid), len(self.nrv_grid), fit_post.model.num_planets))
+        for k in fit_config_file_obj.planet_letters.keys():
+            ksim_over_ktruth[:, :, k - 1] /= self.base_post.params[f'k{k}']
+        
+        i = 0
         for moc in tqdm(self.moc_grid, disable=disable_progress_bar):
-            for nrv in self.nrv_grid:
-                pass
+            for j, nrv in enumerate(self.nrv_grid):
+                mask = (self.time_grid - self.config_file_obj.time_base) % moc == 0
+                mask &= (self.time_grid - self.config_file_obj.time_base) / moc < nrv
+                k_maps = self.__fit_and_get_map_params(mask, verbose=False)
+
+                for k in range(fit_post.model.num_planets):
+                    ksim_over_ktruth[i, j, k] *= k_maps[k]
+
+            i += 1
+        
+        return ksim_over_ktruth
+
                 
