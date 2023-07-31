@@ -23,7 +23,7 @@ class SynthSimGrid:
         post.likelihood.x = self.time_grid[mask]
         post.likelihood.y = self.mnvel_grid[mask]
         post.likelihood.yerr = self.errvel_grid[mask]
-
+        
         post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
         return np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
 
@@ -42,12 +42,20 @@ class SynthSimGrid:
             # Extract orbit parameters
             p = base_post.params[f'per{pl_ind}'].value
             tc = base_post.params[f'tc{pl_ind}'].value
-            ecc = base_post.params[f'ecc{pl_ind}'].value
-            omega = base_post.params[f'omega{pl_ind}'].value
-            tp = radvel.orbit.timetrans_to_timeperi(tc, p, ecc, omega)
+            if 'secosw' in base_config_file_obj.fitting_basis and 'sesinw' in base_config_file_obj.fitting_basis:
+                secosw = base_post.params[f'secosw{pl_ind}'].value
+                sesinw = base_post.params[f'secosw{pl_ind}'].value
+                e = secosw**2 + sesinw**2
+                omega = np.arctan(sesinw / secosw)
+                if np.isnan(omega):
+                    omega = 0.0
+            else:
+                e = base_post.params[f'e{pl_ind}'].value
+                omega = base_post.params[f'omega{pl_ind}'].value
+            tp = radvel.orbit.timetrans_to_timeperi(tc, p, e, omega)
             k = base_post.params[f'k{pl_ind}'].value
             
-            orbel = (p, tp, ecc, omega, k)
+            orbel = (p, tp, e, omega, k)
             rv_tot += radvel.kepler.rv_drive(time_grid, orbel)
 
         # Add background trend if applicable. Need to input correct dvdt and curv values in config file.
@@ -74,8 +82,11 @@ class SynthSimGrid:
         i = 0
         for moc in tqdm(self.moc_grid, disable=disable_progress_bar):
             for j, nrv in enumerate(self.nrv_grid):
-                mask = (self.time_grid - self.config_file_obj.time_base) % moc == 0
-                mask &= (self.time_grid - self.config_file_obj.time_base) / moc < nrv
+
+                # Note: fit_config_file_obj.time_base and self.base_config_file_obj.time_base should probably be the same.
+                mask = (self.time_grid - fit_config_file_obj.time_base) % moc == 0
+                mask &= (self.time_grid - fit_config_file_obj.time_base) / moc < nrv
+                
                 k_maps = self.__fit_and_get_k_maps(fit_post, mask, list(fit_config_file_obj.planet_letters.keys()), verbose=False)
 
                 for k in range(fit_post.model.num_planets):
@@ -83,4 +94,5 @@ class SynthSimGrid:
 
             i += 1
         
+        self.ksim_over_ktruth = ksim_over_ktruth
         return ksim_over_ktruth
