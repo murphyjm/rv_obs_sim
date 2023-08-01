@@ -14,7 +14,6 @@ class SynthSimGrid:
         self.fit_config_file = fit_config_file
 
         self.random_seed = random_seed
-        np.random.seed(self.random_seed)
         self.tel = tel
         self.astro_jitter = astro_jitter
         self.tel_jitter = tel_jitter
@@ -27,6 +26,7 @@ class SynthSimGrid:
         Should only have to generate the synthetic RVs once, but on a large grid, and then you can just 
         resample them later based on the number of RVs requested and the MOC.
         '''
+        np.random.seed(self.random_seed)
         base_config_file_obj, base_post = radvel.utils.initialize_posterior(self.base_config_file)
         time_grid = np.arange(self.max_baseline) + base_config_file_obj.time_base
 
@@ -71,7 +71,9 @@ class SynthSimGrid:
         post.priors += [radvel.prior.HardBounds(f'jit_{self.tel}', 0.0, 20.0)] # HACK! Make sure this matches the priors in fit_config_file.py!!
 
         post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
-        return np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
+        k_maps = np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
+        
+        return k_maps
         
     def get_ksim_over_ktruth_grid(self, disable_progress_bar=False):
 
