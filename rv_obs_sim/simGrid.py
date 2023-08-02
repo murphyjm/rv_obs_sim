@@ -29,8 +29,9 @@ class SynthSimGrid:
         '''
         np.random.seed(self.random_seed)
         base_config_file_obj, base_post = radvel.utils.initialize_posterior(self.base_config_file)
-        time_grid_no_jit = np.arange(self.max_baseline) + base_config_file_obj.time_base
-        time_grid = time_grid_no_jit.astype(float) + np.random.normal(scale=self.time_jitter, size=len(time_grid_no_jit))
+
+        time_grid = (np.arange(self.max_baseline) + base_config_file_obj.time_base).astype(float)
+        time_grid += np.random.normal(scale=self.time_jitter, size=len(time_grid))
 
         rv_tot = np.zeros(len(time_grid))
 
@@ -66,7 +67,6 @@ class SynthSimGrid:
         self.base_config_file_obj = base_config_file_obj
 
         self.time_grid, self.mnvel_grid, self.errvel_grid = time_grid, rv_tot, self.errvel_scale * np.ones(len(rv_tot))
-        self.__time_grid_no_jit = time_grid_no_jit
 
     def __fit_and_get_k_maps(self, fit_like, planet_letter_keys, verbose=False):
         
@@ -88,13 +88,14 @@ class SynthSimGrid:
             ksim_over_ktruth[:, :, k - 1] /= self.base_post.params[f'k{k}'].value
         
         i = 0
+        time_grid_inds = np.arange(self.max_baseline)
         for moc in tqdm(self.moc_grid, disable=disable_progress_bar):
-            moc_mask = (self.__time_grid_no_jit - fit_config_file_obj.time_base) % moc == 0
+            moc_mask = time_grid_inds % moc == 0
 
             for j, nrv in enumerate(self.nrv_grid):
 
                 # Note: fit_config_file_obj.time_base and self.base_config_file_obj.time_base should probably be the same.
-                mask = moc_mask & ((self.__time_grid_no_jit - fit_config_file_obj.time_base) / moc < nrv)
+                mask = moc_mask & (time_grid_inds / moc < nrv)
 
                 fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
                 fit_like = radvel.likelihood.RVLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
