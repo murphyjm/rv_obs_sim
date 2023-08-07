@@ -75,9 +75,8 @@ class SynthSimGrid:
 
         post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
         k_maps = np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
-
         return k_maps
-        
+
     def get_ksim_over_ktruth_grid(self, disable_progress_bar=False):
 
         self.__set_parent_synth_data_grid()
