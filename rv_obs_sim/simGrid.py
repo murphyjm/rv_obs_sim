@@ -6,8 +6,9 @@ from tqdm import tqdm
 class SimGrid:
     
     def __init__(self, moc_grid, nrv_grid, base_config_file, fit_config_file, 
-                 data_file=None, read_csv_kwargs={}, 
+                 data_file=None, 
                  obs_start_end=(None, None),
+                 read_csv_kwargs={},
                  random_seed=42,
                  tel='hires_j', 
                  time_jitter=0, astro_rv_jitter=0, tel_rv_jitter=0, errvel_scale=2, 
@@ -15,13 +16,17 @@ class SimGrid:
 
         self.moc_grid = moc_grid
         self.nrv_grid = nrv_grid
+
         self.base_config_file = base_config_file
+        base_config_file_obj, base_post = radvel.utils.initialize_posterior(self.base_config_file)
+        self.base_config_file_obj = base_config_file_obj
+        self.base_post = base_post
+
         self.fit_config_file = fit_config_file
         self.data_file = data_file
-
+        self.obs_start, self.obs_end = obs_start_end
         if self.data_file is not None:
             self.__load_data(**read_csv_kwargs)
-        self.obs_start, self.obs_end = obs_start_end
 
         self.random_seed = random_seed
         np.random.seed(self.random_seed)
@@ -66,43 +71,39 @@ class SimGrid:
         Should only have to generate the synthetic RVs once, but on a large grid, and then you can just 
         resample them later based on the number of RVs requested and the MOC.
         '''
-        base_config_file_obj, base_post = radvel.utils.initialize_posterior(self.base_config_file)
 
-        time_grid = (np.arange(self.max_baseline) + base_config_file_obj.time_base).astype(float)
+        time_grid = (np.arange(self.max_baseline) + self.base_config_file_obj.time_base).astype(float)
         time_grid += np.random.normal(scale=self.time_jitter, size=len(time_grid))
 
         rv_tot = np.zeros(len(time_grid))
 
-        for pl_ind in base_config_file_obj.planet_letters.keys(): # Need to input correct K-amplitudes in config file.
+        for pl_ind in self.base_config_file_obj.planet_letters.keys(): # Need to input correct K-amplitudes in config file.
             
             # Extract orbit parameters
-            p = base_post.params[f'per{pl_ind}'].value
-            tc = base_post.params[f'tc{pl_ind}'].value
-            if 'secosw' in base_config_file_obj.fitting_basis and 'sesinw' in base_config_file_obj.fitting_basis:
-                secosw = base_post.params[f'secosw{pl_ind}'].value
-                sesinw = base_post.params[f'secosw{pl_ind}'].value
+            p = self.base_post.params[f'per{pl_ind}'].value
+            tc = self.base_post.params[f'tc{pl_ind}'].value
+            if 'secosw' in self.base_config_file_obj.fitting_basis and 'sesinw' in self.base_config_file_obj.fitting_basis:
+                secosw = self.base_post.params[f'secosw{pl_ind}'].value
+                sesinw = self.base_post.params[f'secosw{pl_ind}'].value
                 e = secosw**2 + sesinw**2
                 omega = np.arctan(sesinw / secosw)
                 if np.isnan(omega):
                     omega = 0.0
             else:
-                e = base_post.params[f'e{pl_ind}'].value
-                omega = base_post.params[f'omega{pl_ind}'].value
+                e = self.base_post.params[f'e{pl_ind}'].value
+                omega = self.base_post.params[f'omega{pl_ind}'].value
             tp = radvel.orbit.timetrans_to_timeperi(tc, p, e, omega)
-            k = base_post.params[f'k{pl_ind}'].value
+            k = self.base_post.params[f'k{pl_ind}'].value
             
             orbel = (p, tp, e, omega, k)
             rv_tot += radvel.kepler.rv_drive(time_grid, orbel)
 
         # Add background trend if applicable. Need to input correct dvdt and curv values in config file.
-        rv_tot += (time_grid - base_config_file_obj.time_base) * base_post.params['dvdt'].value
-        rv_tot += (time_grid - base_config_file_obj.time_base)**2 * base_post.params['curv'].value
+        rv_tot += (time_grid - self.base_config_file_obj.time_base) * self.base_post.params['dvdt'].value
+        rv_tot += (time_grid - self.base_config_file_obj.time_base)**2 * self.base_post.params['curv'].value
 
         # Add random noise
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_rv_jitter**2 + self.tel_rv_jitter**2), size=len(rv_tot))
-
-        self.base_post = base_post
-        self.base_config_file_obj = base_config_file_obj
 
         self.time_grid, self.mnvel_grid, self.errvel_grid = time_grid, rv_tot, self.errvel_scale * np.ones(len(rv_tot))
 
@@ -173,7 +174,7 @@ class SimGrid:
                     for k in range(fit_post.model.num_planets):
                         ksim_over_ktruth[i, j, k] *= k_maps[k]
 
-                    i += 1
+                i += 1
         
         self.ksim_over_ktruth = ksim_over_ktruth
         return ksim_over_ktruth
