@@ -121,7 +121,7 @@ class SimGrid:
         if self.data_file is None:
             self.__set_parent_synth_data_grid()
 
-        fit_config_file_obj, fit_post = radvel.utils.initialize_posterior(self.fit_config_file) 
+        fit_config_file_obj, fit_post = radvel.utils.initialize_posterior(self.fit_config_file)
 
         ksim_over_ktruth = np.ones((len(self.moc_grid), len(self.nrv_grid), fit_post.model.num_planets))
         for k in fit_config_file_obj.planet_letters.keys():
