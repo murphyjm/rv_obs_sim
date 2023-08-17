@@ -107,21 +107,20 @@ class SimGrid:
 
         self.time_grid, self.mnvel_grid, self.errvel_grid = time_grid, rv_tot, self.errvel_scale * np.ones(len(rv_tot))
 
-    def __fit_and_get_k_maps(self, fit_like, planet_letter_keys, verbose=False):
-        
-        post = radvel.posterior.Posterior(fit_like)
+    def __fit_and_get_post(self, post, verbose=False):
         post.priors += [radvel.prior.HardBounds(f'jit_{self.tel}', 0.0, 20.0)] # HACK! Make sure this matches the priors in fit_config_file.py!!
-
         post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
-        k_maps = np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
-        return k_maps
+        return post
 
-    def get_ksim_over_ktruth_grid(self, disable_progress_bar=False):
+    def get_ksim_over_ktruth_grid(self, disable_progress_bar=False, save_posts=False):
 
         if self.data_file is None:
             self.__set_parent_synth_data_grid()
 
         fit_config_file_obj, fit_post = radvel.utils.initialize_posterior(self.fit_config_file)
+
+        if save_posts:
+            post_grid = np.empty((len(self.moc_grid), len(self.nrv_grid)), dtype=object)
 
         ksim_over_ktruth = np.ones((len(self.moc_grid), len(self.nrv_grid), fit_post.model.num_planets))
         for k in fit_config_file_obj.planet_letters.keys():
@@ -140,10 +139,16 @@ class SimGrid:
 
                     fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
                     fit_like = radvel.likelihood.RVLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
-                    k_maps = self.__fit_and_get_k_maps(fit_like, list(fit_config_file_obj.planet_letters.keys()), verbose=False)
+                    post = radvel.posterior.Posterior(fit_like)
+                    post = self.__fit_and_get_post(post, verbose=False)
+                    planet_letter_keys = list(fit_config_file_obj.planet_letters.keys())
+                    k_maps = np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
 
                     for k in range(fit_post.model.num_planets):
                         ksim_over_ktruth[i, j, k] *= k_maps[k]
+
+                    if save_posts:
+                        post_grid[i, j] = post
 
                 i += 1
         else:
@@ -169,12 +174,21 @@ class SimGrid:
                     resampled_data = self.data.iloc[good_inds]
                     fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
                     fit_like = radvel.likelihood.RVLikelihood(fit_mod, resampled_data.time, resampled_data.mnvel, resampled_data.errvel)
-                    k_maps = self.__fit_and_get_k_maps(fit_like, list(fit_config_file_obj.planet_letters.keys()), verbose=False)
+                    post = radvel.posterior.Posterior(fit_like)
+                    post = self.__fit_and_get_post(post, verbose=False)
+                    planet_letter_keys = list(fit_config_file_obj.planet_letters.keys())
+                    k_maps = np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
 
                     for k in range(fit_post.model.num_planets):
                         ksim_over_ktruth[i, j, k] *= k_maps[k]
 
+                    if save_posts:
+                        post_grid[i, j] = post
+
                 i += 1
         
         self.ksim_over_ktruth = ksim_over_ktruth
+        if save_posts:
+            self.post_grid = post_grid
+            
         return ksim_over_ktruth
