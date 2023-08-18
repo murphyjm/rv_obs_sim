@@ -245,6 +245,8 @@ class SimGrid:
         Given an observing cadence and a number of RVs, plot the best-fit solution the results in the recovered K-amplitude.
 
         08/17/23: Some weird bug where you have to run this function twice to make it update correctly.
+
+        TODO: Fix plotting bug.
         '''
         assert hasattr(self, 'post_grid'), "SimGrid object does not have a post_grid attribute. Try re-running get_ksim_over_ktruth_grid() with save_posts=True."
 
