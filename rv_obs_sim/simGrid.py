@@ -292,6 +292,9 @@ class SimGrid:
             norm = colors.BoundaryNorm(bounds, cmap.N)
             cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 0.90, 1, 1.10, 1.25, 1.50, 1.75, 2]
 
+        fig_arr = np.empty(self.fit_config_file_obj.nplanets, dtype=object)
+        axes_arr = np.empty((self.fit_config_file_obj.nplanets, 3), dtype=object)
+
         for pl_ind, pl_letter in self.fit_config_file_obj.planet_letters.items():
             fig, ax = plt.subplots(figsize=(10, 8))
             px = (self.nrv_grid[-1] - self.nrv_grid[0]) / len(self.nrv_grid)
@@ -410,4 +413,7 @@ class SimGrid:
                 fig.savefig(fname, 
                             bbox_inches='tight')
             
-            return fig, [ax, ax2, cbar]
+            fig_arr[pl_ind - 1] = fig
+            axes_arr[pl_ind - 1, :] = np.array([ax, ax2, cbar], dtype=object)
+            
+        return fig_arr, axes_arr
