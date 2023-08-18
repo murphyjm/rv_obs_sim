@@ -151,6 +151,7 @@ class SimGrid:
                     fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
                     fit_like = radvel.likelihood.RVLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
                     post = radvel.posterior.Posterior(fit_like)
+                    post.priors += self.fit_config_file_obj.priors
                     post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
                     planet_letter_keys = list(fit_config_file_obj.planet_letters.keys())
                     k_maps = np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
@@ -186,6 +187,7 @@ class SimGrid:
                     fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
                     fit_like = radvel.likelihood.RVLikelihood(fit_mod, resampled_data.time, resampled_data.mnvel, resampled_data.errvel)
                     post = radvel.posterior.Posterior(fit_like)
+                    post.priors += self.fit_config_file_obj.priors
                     post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
                     planet_letter_keys = list(fit_config_file_obj.planet_letters.keys())
                     k_maps = np.array([post.params[f'k{i}'].value for i in planet_letter_keys])
