@@ -279,20 +279,20 @@ class SimGrid:
             vmin = -5
             vmax = 5
             cbar_xticks = np.linspace(vmin, vmax, (vmax - vmin) + 1)
-            cbar_xticks = np.sort(np.append(cbar_xticks, [-0.5, 0.5]))
+            # cbar_xticks = np.sort(np.append(cbar_xticks, [-0.5, 0.5]))
             bounds = cbar_xticks[cbar_xticks != 0]
             norm = colors.BoundaryNorm(bounds, cmap.N)
-            cbar_xtick_labels = [-5, -4, -3, -2, -1, -0.5, 0, 0.5, 1, 2, 3, 4, 5]
+            cbar_xtick_labels = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
             
 
         elif cbar_units == 'ratio':
             vmin = 0
             vmax = 2
             cbar_xticks = np.linspace(vmin, vmax, (vmax - vmin)*4 + 1)
-            cbar_xticks = np.sort(np.append(cbar_xticks, [0.90, 1.10]))
+            # cbar_xticks = np.sort(np.append(cbar_xticks, [0.90, 1.10]))
             bounds = cbar_xticks[cbar_xticks != 1]
             norm = colors.BoundaryNorm(bounds, cmap.N)
-            cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 0.90, 1, 1.10, 1.25, 1.50, 1.75, 2]
+            cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 1, 1.25, 1.50, 1.75, 2]
 
         fig_arr = np.empty(self.fit_config_file_obj.nplanets, dtype=object)
         axes_arr = np.empty((self.fit_config_file_obj.nplanets, 3), dtype=object)
