@@ -262,7 +262,7 @@ class SimGrid:
             fig.savefig(savefname, bbox_inches='tight')
         return fig, axes
     
-    def make_grid_plot(self, grid, cbar_units='ratio', savefig=False):
+    def make_grid_plot(self, grid, cbar_units='ratio', savefig=False, save_ext='.pdf', save_dpi=600):
         '''
         Make the nice plot of the simulation grid results.
         '''
@@ -382,7 +382,7 @@ class SimGrid:
                 time_range_mask &= self.data['time'] < self.obs_end
                 inds = self.data[time_range_mask].index
                 nrv_max_for_moc_arr = np.empty(len(self.moc_grid))
-                for i,moc in enumerate(self.self.moc_grid):
+                for i,moc in enumerate(self.moc_grid):
                     good_inds = [inds[0]]
                     prev_time = self.data.loc[good_inds[0], 'time']
                     for k in range(1, len(inds)):
@@ -411,9 +411,12 @@ class SimGrid:
             ax.set_title(f"{data_type} data: {self.sys_name}, {fname.split('_')[1] + ' ' + fname.split('_')[2]}")
 
             if savefig:
-                fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_planet_{pl_letter}_sigma_units.pdf'
-                fig.savefig(fname, 
-                            bbox_inches='tight')
+                fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_planet_{pl_letter}_{cbar_units}{save_ext}'
+                save_fig_kwargs = {'bbox_inches':'tight'}
+                if save_ext == '.png':
+                    save_fig_kwargs['dpi'] = save_dpi
+                    save_fig_kwargs['facecolor'] = 'white'
+                fig.savefig(fname, **save_fig_kwargs)
             
             fig_arr[pl_ind - 1] = fig
             axes_arr[pl_ind - 1, :] = np.array([ax, ax2, cbar], dtype=object)
