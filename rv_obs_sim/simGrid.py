@@ -68,8 +68,7 @@ class SimGrid:
         assert set(['time', 'mnvel','errvel', 'tel']).issubset(df.columns), "Data must have columns: 'time', 'mnvel', 'errvel', 'tel'."
         
         data = pd.DataFrame()
-
-        bintime, binmnvel, binerrvel, bintel = radvel.utils.bintels(df.time, df.mnvel, df.errvel, df.tel, binsize=0.1)
+        bintime, binmnvel, binerrvel, bintel = radvel.utils.bintels(df.time.values, df.mnvel.values, df.errvel.values, df.tel.values, binsize=0.1)
         data['time'] = bintime
         data['mnvel'] = binmnvel
         data['errvel'] = binerrvel
