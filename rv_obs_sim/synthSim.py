@@ -13,7 +13,7 @@ class RVPlanet:
     def __str__(self) -> str:
         str_out  = '-----'
         str_out += f"Planet {self.pl_letter}\n"
-        str_out += f"P = {self.p:10} d\n"
+        str_out += f"P = {self.per:10} d\n"
         str_out += f"Tperi = {self.tp:10} BJD\n"
         str_out += f"Ecc = {self.e:10}\n"
         str_out += f"Omega = {self.omega:10}\n"
@@ -26,7 +26,7 @@ class RVPlanet:
         Note: Tp is time of periastron passage **not** time of transit.
         '''
         self.orbel = orbel
-        self.p, self.tp, self.e, self.omega, self.k = self.orbel
+        self.per, self.tp, self.e, self.omega, self.k = self.orbel
 
 class RVStar:
 
@@ -117,9 +117,7 @@ class SynthSim(RVStar):
         '''
         Pick which dates the observations will be taken
         '''
-        #self.min_obs_cadence = round(self.min_obs_cadence)
-
-        date_grid = np.arange(self.N_DATE_GRID) + self.obs_bjd_start
+        date_grid = np.arange(self.N_DATE_GRID, dtype=float) + self.obs_bjd_start
         if self.min_obs_cadence == 0:
             obs_dates = date_grid
         else:
@@ -129,21 +127,20 @@ class SynthSim(RVStar):
         mask = np.ones(len(obs_dates), dtype=bool)
         
         obs_dates = obs_dates[mask][:self.nobs]
-        self.obs_dates = obs_dates
-        return self.obs_dates
+        return obs_dates
 
-    def get_simulated_obs(self) -> tuple:
+    def get_simulated_obs(self, time_grid) -> tuple:
         
-        rv_tot = np.zeros(len(self.obs_dates))
+        rv_tot = np.zeros(len(time_grid))
 
         for planet in self.star.planets.values():
-            rv_tot += rv_drive(self.obs_dates, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
+            rv_tot += rv_drive(time_grid, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
         
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2), size=len(rv_tot))
 
-        rv_tot += self.obs_dates * self.star.dvdt
+        rv_tot += time_grid * self.star.dvdt
         
         df = pd.DataFrame()
-        df['time'], df['mnvel'], df['errvel'], df['tel'] = self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name
+        df['time'], df['mnvel'], df['errvel'], df['tel'] = time_grid, rv_tot, self.rv_meas_err, self.tel_name
         self.data = df
         return df
