@@ -68,8 +68,7 @@ class SimGrid:
         assert set(['time', 'mnvel','errvel', 'tel']).issubset(df.columns), "Data must have columns: 'time', 'mnvel', 'errvel', 'tel'."
         
         data = pd.DataFrame()
-
-        bintime, binmnvel, binerrvel, bintel = radvel.utils.bintels(df.time, df.mnvel, df.errvel, df.tel, binsize=0.1)
+        bintime, binmnvel, binerrvel, bintel = radvel.utils.bintels(df.time.values, df.mnvel.values, df.errvel.values, df.tel.values, binsize=0.1)
         data['time'] = bintime
         data['mnvel'] = binmnvel
         data['errvel'] = binerrvel
@@ -262,7 +261,7 @@ class SimGrid:
             fig.savefig(savefname, bbox_inches='tight')
         return fig, axes
     
-    def make_grid_plot(self, grid, cbar_units='ratio', savefig=False):
+    def make_grid_plot(self, grid, cbar_units='ratio', savefig=False, save_ext='.pdf', save_dpi=600):
         '''
         Make the nice plot of the simulation grid results.
         '''
@@ -279,20 +278,20 @@ class SimGrid:
             vmin = -5
             vmax = 5
             cbar_xticks = np.linspace(vmin, vmax, (vmax - vmin) + 1)
-            cbar_xticks = np.sort(np.append(cbar_xticks, [-0.5, 0.5]))
+            # cbar_xticks = np.sort(np.append(cbar_xticks, [-0.5, 0.5]))
             bounds = cbar_xticks[cbar_xticks != 0]
             norm = colors.BoundaryNorm(bounds, cmap.N)
-            cbar_xtick_labels = [-5, -4, -3, -2, -1, -0.5, 0, 0.5, 1, 2, 3, 4, 5]
+            cbar_xtick_labels = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
             
 
         elif cbar_units == 'ratio':
             vmin = 0
             vmax = 2
             cbar_xticks = np.linspace(vmin, vmax, (vmax - vmin)*4 + 1)
-            cbar_xticks = np.sort(np.append(cbar_xticks, [0.90, 1.10]))
+            # cbar_xticks = np.sort(np.append(cbar_xticks, [0.90, 1.10]))
             bounds = cbar_xticks[cbar_xticks != 1]
             norm = colors.BoundaryNorm(bounds, cmap.N)
-            cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 0.90, 1, 1.10, 1.25, 1.50, 1.75, 2]
+            cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 1, 1.25, 1.50, 1.75, 2]
 
         fig_arr = np.empty(self.fit_config_file_obj.nplanets, dtype=object)
         axes_arr = np.empty((self.fit_config_file_obj.nplanets, 3), dtype=object)
@@ -382,7 +381,7 @@ class SimGrid:
                 time_range_mask &= self.data['time'] < self.obs_end
                 inds = self.data[time_range_mask].index
                 nrv_max_for_moc_arr = np.empty(len(self.moc_grid))
-                for i,moc in enumerate(self.self.moc_grid):
+                for i,moc in enumerate(self.moc_grid):
                     good_inds = [inds[0]]
                     prev_time = self.data.loc[good_inds[0], 'time']
                     for k in range(1, len(inds)):
@@ -411,9 +410,12 @@ class SimGrid:
             ax.set_title(f"{data_type} data: {self.sys_name}, {fname.split('_')[1] + ' ' + fname.split('_')[2]}")
 
             if savefig:
-                fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_planet_{pl_letter}_sigma_units.pdf'
-                fig.savefig(fname, 
-                            bbox_inches='tight')
+                fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_planet_{pl_letter}_{cbar_units}{save_ext}'
+                save_fig_kwargs = {'bbox_inches':'tight'}
+                if save_ext == '.png':
+                    save_fig_kwargs['dpi'] = save_dpi
+                    save_fig_kwargs['facecolor'] = 'white'
+                fig.savefig(fname, **save_fig_kwargs)
             
             fig_arr[pl_ind - 1] = fig
             axes_arr[pl_ind - 1, :] = np.array([ax, ax2, cbar], dtype=object)
