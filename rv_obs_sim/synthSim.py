@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from radvel.kepler import rv_drive
+import radvel
 
 class RVPlanet:
 
@@ -72,7 +72,6 @@ class SynthSim(RVStar):
                  tel_jitter:float=0, 
                  astro_jitter:float=0,
                  obs_bjd_start:float=2457000) -> None:
-        
         self.star = star
         self.tel_name = tel_name
         self.rv_meas_err = rv_meas_err
@@ -134,7 +133,7 @@ class SynthSim(RVStar):
         rv_tot = np.zeros(len(time_grid))
 
         for planet in self.star.planets.values():
-            rv_tot += rv_drive(time_grid, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
+            rv_tot += radvel.kepler.rv_drive(time_grid, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
         
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2), size=len(rv_tot))
 
@@ -144,3 +143,84 @@ class SynthSim(RVStar):
         df['time'], df['mnvel'], df['errvel'], df['tel'] = time_grid, rv_tot, self.rv_meas_err, self.tel_name
         self.data = df
         return df
+    
+    def get_radvel_post(self, priors=[]) -> radvel.posterior.Posterior:
+        '''
+        Take a simulation object and get a RadVel posterior object.
+        '''
+        nplanets = len(self.star.planets)
+        fitting_basis = 'per tc secosw sesinw k'
+        planet_letters = {num+1:letter for num, letter in zip(range(len(self.star.planets)), self.star.planets.keys())}
+
+        # Define prior centers (initial guesses) in a basis of your choice (need not be in the fitting basis)
+        anybasis_params = radvel.Parameters(nplanets, basis='per tc e w k', 
+                                            planet_letters=planet_letters) # initialize Parameters object
+        for pl_num, pl_letter in planet_letters.items():
+            per, tp, e, w, k = self.star.planets[pl_letter].orbel
+            anybasis_params[f'per{pl_num}'] = radvel.Parameter(value=per)
+            tc = radvel.orbit.timeperi_to_timetrans(tp, per, e, w, secondary=False)
+            anybasis_params[f'tc{pl_num}'] = radvel.Parameter(value=tc)
+            anybasis_params[f'e{pl_num}'] = radvel.Parameter(value=e)
+            anybasis_params[f'w{pl_num}'] = radvel.Parameter(value=w)
+            anybasis_params[f'k{pl_num}'] = radvel.Parameter(value=k)
+
+        anybasis_params['dvdt'] = radvel.Parameter(value=self.star.dvdt)
+        anybasis_params['curv'] = radvel.Parameter(value=0.0)
+
+        bin_t, bin_vel, bin_err, bin_tel = radvel.utils.bintels(self.data['time'].values, self.data['mnvel'].values, self.data['errvel'].values, self.data['tel'].values, binsize=0.1)
+        data = pd.DataFrame([], columns=['time', 'mnvel', 'errvel', 'tel'])
+        data['time'] = bin_t
+        data['mnvel'] = bin_vel
+        data['errvel'] = bin_err
+        data['tel'] = bin_tel
+
+        time_base = np.median(self.data.time)
+        instnames = np.unique(self.data.tel)
+        for tel in instnames:
+            anybasis_params[f'gamma_{tel}'] = radvel.Parameter(value=0.0)
+            anybasis_params[f'jit_{tel}'] = radvel.Parameter(value=2.0)
+
+        params = anybasis_params.basis.to_any_basis(anybasis_params, fitting_basis)
+
+        iparams = radvel.basis._copy_params(params) # Taken from rvsearch.utils.initialize_post() but not sure why it's needed
+
+        mod = radvel.RVModel(params, time_base=time_base)
+
+        for i in range(nplanets):
+            mod.params[f'per{i+1}'].vary = False
+            mod.params[f'tc{i+1}'].vary = False
+            mod.params[f'secosw{i+1}'].vary = False
+            mod.params[f'sesinw{i+1}'].vary = False
+        
+        mod.params['dvdt'].vary = False
+        mod.params['curv'].vary = False
+
+        for tel in instnames:
+            mod.params[f'gamma_{tel}'].vary = True
+            mod.params[f'jit_{tel}'].vary = True
+
+        inst_priors = []
+        for tel in instnames:
+            inst_priors.append(radvel.prior.HardBounds(f'gamma_{tel}', -100, 100))
+            inst_priors.append(radvel.prior.HardBounds(f'jit_{tel}', 0, 20))
+
+        priors += inst_priors
+        
+        # This block copied from rvsearch.utils.initialize_post()
+        # >>>>>>>>>
+        
+        # initialize Likelihood objects for each instrument
+        telgrps = self.data.groupby('tel').groups
+        likes = {}
+
+        for inst in telgrps.keys():
+            # 10/8: ADD DECORRELATION VECTORS AND VARS, ONLY FOR SELECTED INST.
+            likes[inst] = radvel.likelihood.RVLikelihood(mod, self.data.iloc[telgrps[inst]].time, self.data.iloc[telgrps[inst]].mnvel, self.data.iloc[telgrps[inst]].errvel, suffix='_'+inst)
+            likes[inst].params['gamma_'+inst] = iparams['gamma_'+inst]
+            likes[inst].params['jit_'+inst] = iparams['jit_'+inst]
+        # Can this be cleaner? like = radvel.likelihood.CompositeLikelihood(likes)
+        like = radvel.likelihood.CompositeLikelihood(list(likes.values()))
+        # <<<<<<<<<
+        post = radvel.posterior.Posterior(like)
+        post.priors = priors
+        return post
