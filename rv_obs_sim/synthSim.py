@@ -112,16 +112,33 @@ class SynthSim(RVStar):
         except:
             pass
 
-    def get_obs_dates(self) -> object:
+    def get_obs_dates(self, use_cps_date_grid=False) -> object:
         '''
         Pick which dates the observations will be taken
         '''
-        date_grid = np.arange(self.N_DATE_GRID, dtype=float) + self.obs_bjd_start
-        if self.min_obs_cadence == 0:
-            obs_dates = date_grid
+        if use_cps_date_grid:
+            date_grid = pd.read_csv('cps_obs_dates_2023AB.csv')
+            date_grid = date_grid.drop_duplicates().reset_index(drop=True)
+            date_grid['time'] = pd.DatetimeIndex(date_grid['date']).to_julian_date()
+            date_grid = date_grid.sort_values(by='time').reset_index(drop=True)
+            date_grid = date_grid['time'].values
+            if self.min_obs_cadence == 0:
+                obs_dates = date_grid
+            else:
+                obs_dates = [date_grid[0]]
+                for i in range(1, len(date_grid)):
+                    if date_grid[i] - obs_dates[-1] < self.min_obs_cadence:
+                        continue
+                    else:
+                        obs_dates.append(date_grid[i])
+                obs_dates = np.asarray(obs_dates)
         else:
-            obs_dates = date_grid[::self.min_obs_cadence]
-        
+            date_grid = np.arange(self.N_DATE_GRID, dtype=float) + self.obs_bjd_start
+            if self.min_obs_cadence == 0:
+                obs_dates = date_grid
+            else:
+                obs_dates = date_grid[::self.min_obs_cadence]
+
         # This is where you would apply masks for: (1) observability, (2) bad weather, (3) telescope schedule, etc.
         mask = np.ones(len(obs_dates), dtype=bool)
         
