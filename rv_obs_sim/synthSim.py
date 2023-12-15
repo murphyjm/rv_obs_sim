@@ -204,8 +204,12 @@ class SynthSim(RVStar):
         mod = radvel.RVModel(params, time_base=time_base)
 
         for i in range(nplanets):
-            mod.params[f'per{i+1}'].vary = True
-            mod.params[f'tc{i+1}'].vary = True
+            if i + 1 == 1:
+                mod.params[f'per{i+1}'].vary = False
+                mod.params[f'tc{i+1}'].vary = False
+            else:
+                mod.params[f'per{i+1}'].vary = True
+                mod.params[f'tc{i+1}'].vary = True
             mod.params[f'secosw{i+1}'].vary = False
             mod.params[f'sesinw{i+1}'].vary = False
         
