@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from radvel.kepler import rv_drive
+import radvel
 
 class RVPlanet:
 
@@ -13,7 +13,7 @@ class RVPlanet:
     def __str__(self) -> str:
         str_out  = '-----'
         str_out += f"Planet {self.pl_letter}\n"
-        str_out += f"P = {self.p:10} d\n"
+        str_out += f"P = {self.per:10} d\n"
         str_out += f"Tperi = {self.tp:10} BJD\n"
         str_out += f"Ecc = {self.e:10}\n"
         str_out += f"Omega = {self.omega:10}\n"
@@ -26,7 +26,7 @@ class RVPlanet:
         Note: Tp is time of periastron passage **not** time of transit.
         '''
         self.orbel = orbel
-        self.p, self.tp, self.e, self.omega, self.k = self.orbel
+        self.per, self.tp, self.e, self.omega, self.k = self.orbel
 
 class RVStar:
 
@@ -56,7 +56,7 @@ class RVStar:
     def get_mstar(self) -> float:
         return self.mstar
     
-    def set_dvdt(self, dvdt:float) -> float:
+    def set_dvdt(self, dvdt:float):
         self.dvdt = dvdt
 
 class SynthSim(RVStar):
@@ -72,7 +72,6 @@ class SynthSim(RVStar):
                  tel_jitter:float=0, 
                  astro_jitter:float=0,
                  obs_bjd_start:float=2457000) -> None:
-        
         self.star = star
         self.tel_name = tel_name
         self.rv_meas_err = rv_meas_err
@@ -113,40 +112,136 @@ class SynthSim(RVStar):
         except:
             pass
 
-    def get_obs_dates(self) -> object:
+    def get_obs_dates(self, use_cps_date_grid=False) -> object:
         '''
         Pick which dates the observations will be taken
         '''
-        #self.min_obs_cadence = round(self.min_obs_cadence)
-
-        date_grid = np.arange(self.N_DATE_GRID) + self.obs_bjd_start
-        if self.min_obs_cadence == 0:
-            obs_dates = date_grid
+        if use_cps_date_grid:
+            date_grid = pd.read_csv('cps_obs_dates_2023AB.csv')
+            date_grid = date_grid.drop_duplicates().reset_index(drop=True)
+            date_grid['time'] = pd.DatetimeIndex(date_grid['date']).to_julian_date()
+            date_grid = date_grid.sort_values(by='time').reset_index(drop=True)
+            date_grid = date_grid['time'].values
+            if self.min_obs_cadence == 0:
+                obs_dates = date_grid
+            else:
+                obs_dates = [date_grid[0]]
+                for i in range(1, len(date_grid)):
+                    if date_grid[i] - obs_dates[-1] < self.min_obs_cadence:
+                        continue
+                    else:
+                        obs_dates.append(date_grid[i])
+                obs_dates = np.asarray(obs_dates)
         else:
-            obs_dates = date_grid[::self.min_obs_cadence]
-        
+            date_grid = np.arange(self.N_DATE_GRID, dtype=float) + self.obs_bjd_start
+            if self.min_obs_cadence == 0:
+                obs_dates = date_grid
+            else:
+                obs_dates = date_grid[::self.min_obs_cadence]
+
         # This is where you would apply masks for: (1) observability, (2) bad weather, (3) telescope schedule, etc.
         mask = np.ones(len(obs_dates), dtype=bool)
         
         obs_dates = obs_dates[mask][:self.nobs]
-        self.obs_dates = obs_dates
-        return self.obs_dates
+        return obs_dates
 
-    def get_simulated_obs(self) -> tuple:
+    def get_simulated_obs(self, time_grid) -> tuple:
         
-        rv_tot = np.zeros(len(self.obs_dates))
+        rv_tot = np.zeros(len(time_grid))
 
         for planet in self.star.planets.values():
-            rv_tot += rv_drive(self.obs_dates, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
+            rv_tot += radvel.kepler.rv_drive(time_grid, planet.orbel, use_c_kepler_solver=False) # C solver not working for some reason
         
         rv_tot += np.random.normal(scale=np.sqrt(self.astro_jitter**2 + self.tel_jitter**2), size=len(rv_tot))
 
-        rv_tot += self.obs_dates * self.star.dvdt
+        rv_tot += time_grid * self.star.dvdt
         
         df = pd.DataFrame()
-        df['time'], df['mnvel'], df['errvel'], df['tel'] = self.obs_dates, rv_tot, self.rv_meas_err, self.tel_name
+        df['time'], df['mnvel'], df['errvel'], df['tel'] = time_grid, rv_tot, self.rv_meas_err, self.tel_name
         self.data = df
         return df
     
+    def get_radvel_post(self, priors=[]) -> radvel.posterior.Posterior:
+        '''
+        Take a simulation object and get a RadVel posterior object.
+        '''
+        nplanets = len(self.star.planets)
+        fitting_basis = 'per tc secosw sesinw k'
+        planet_letters = {num+1:letter for num, letter in zip(range(len(self.star.planets)), self.star.planets.keys())}
 
-    
+        # Define prior centers (initial guesses) in a basis of your choice (need not be in the fitting basis)
+        anybasis_params = radvel.Parameters(nplanets, basis='per tc e w k', 
+                                            planet_letters=planet_letters) # initialize Parameters object
+        for pl_num, pl_letter in planet_letters.items():
+            per, tp, e, w, k = self.star.planets[pl_letter].orbel
+            anybasis_params[f'per{pl_num}'] = radvel.Parameter(value=per)
+            tc = radvel.orbit.timeperi_to_timetrans(tp, per, e, w, secondary=False)
+            anybasis_params[f'tc{pl_num}'] = radvel.Parameter(value=tc)
+            anybasis_params[f'e{pl_num}'] = radvel.Parameter(value=e)
+            anybasis_params[f'w{pl_num}'] = radvel.Parameter(value=w)
+            anybasis_params[f'k{pl_num}'] = radvel.Parameter(value=k)
+
+        anybasis_params['dvdt'] = radvel.Parameter(value=self.star.dvdt)
+        anybasis_params['curv'] = radvel.Parameter(value=0.0)
+
+        bin_t, bin_vel, bin_err, bin_tel = radvel.utils.bintels(self.data['time'].values, self.data['mnvel'].values, self.data['errvel'].values, self.data['tel'].values, binsize=0.1)
+        data = pd.DataFrame([], columns=['time', 'mnvel', 'errvel', 'tel'])
+        data['time'] = bin_t
+        data['mnvel'] = bin_vel
+        data['errvel'] = bin_err
+        data['tel'] = bin_tel
+
+        time_base = np.median(self.data.time)
+        instnames = np.unique(self.data.tel)
+        for tel in instnames:
+            anybasis_params[f'gamma_{tel}'] = radvel.Parameter(value=0.0)
+            anybasis_params[f'jit_{tel}'] = radvel.Parameter(value=2.0)
+
+        params = anybasis_params.basis.to_any_basis(anybasis_params, fitting_basis)
+
+        iparams = radvel.basis._copy_params(params) # Taken from rvsearch.utils.initialize_post() but not sure why it's needed
+
+        mod = radvel.RVModel(params, time_base=time_base)
+
+        for i in range(nplanets):
+            if i + 1 == 1:
+                mod.params[f'per{i+1}'].vary = False
+                mod.params[f'tc{i+1}'].vary = False
+            else:
+                mod.params[f'per{i+1}'].vary = True
+                mod.params[f'tc{i+1}'].vary = True
+            mod.params[f'secosw{i+1}'].vary = False
+            mod.params[f'sesinw{i+1}'].vary = False
+        
+        mod.params['dvdt'].vary = False
+        mod.params['curv'].vary = False
+
+        for tel in instnames:
+            mod.params[f'gamma_{tel}'].vary = True
+            mod.params[f'jit_{tel}'].vary = True
+
+        inst_priors = []
+        for tel in instnames:
+            inst_priors.append(radvel.prior.HardBounds(f'gamma_{tel}', -100, 100))
+            inst_priors.append(radvel.prior.HardBounds(f'jit_{tel}', 0, 20))
+
+        priors += inst_priors
+        
+        # This block copied from rvsearch.utils.initialize_post()
+        # >>>>>>>>>
+        
+        # initialize Likelihood objects for each instrument
+        telgrps = self.data.groupby('tel').groups
+        likes = {}
+
+        for inst in telgrps.keys():
+            # 10/8: ADD DECORRELATION VECTORS AND VARS, ONLY FOR SELECTED INST.
+            likes[inst] = radvel.likelihood.RVLikelihood(mod, self.data.iloc[telgrps[inst]].time, self.data.iloc[telgrps[inst]].mnvel, self.data.iloc[telgrps[inst]].errvel, suffix='_'+inst)
+            likes[inst].params['gamma_'+inst] = iparams['gamma_'+inst]
+            likes[inst].params['jit_'+inst] = iparams['jit_'+inst]
+        # Can this be cleaner? like = radvel.likelihood.CompositeLikelihood(likes)
+        like = radvel.likelihood.CompositeLikelihood(list(likes.values()))
+        # <<<<<<<<<
+        post = radvel.posterior.Posterior(like)
+        post.priors = priors
+        return post
