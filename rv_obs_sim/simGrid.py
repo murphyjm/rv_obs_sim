@@ -304,9 +304,7 @@ class SimGrid:
             im = ax.imshow(grid[:, :, pl_ind - 1], 
                         cmap='bwr', 
                         origin='lower', 
-                        extent=extent, 
-                        vmin=vmin, 
-                        vmax=vmax, 
+                        extent=extent,
                         aspect='auto', 
                         norm=norm)
             
