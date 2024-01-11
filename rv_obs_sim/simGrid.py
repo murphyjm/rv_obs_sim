@@ -324,6 +324,9 @@ class SimGrid:
             if per_twin > np.max(self.moc_grid):
                 ax2.yaxis.set_major_locator(MultipleLocator(0.005))
                 ax2.yaxis.set_minor_locator(MultipleLocator(0.001))
+            elif per_twin < 1:
+                ax2.yaxis.set_major_locator(MultipleLocator(5))
+                ax2.yaxis.set_minor_locator(MultipleLocator(1))
             else:
                 ax2.yaxis.set_major_locator(MultipleLocator(0.50))
                 ax2.yaxis.set_minor_locator(MultipleLocator(0.125))
@@ -341,7 +344,10 @@ class SimGrid:
                         per_mults = np.array([0.25, 0.5, 1])
                 else:
                     pl_hlines_ind = pl_ind - 1
-                    per_mults = np.array([0.5, 1, 2])
+                    if self.base_post.params[f'per{pl_hlines_ind}'].value < 1:
+                        per_mults = np.array([1, 10])
+                    else:
+                        per_mults = np.array([0.5, 1, 2])
                 per_hlines = self.base_post.params[f'per{pl_hlines_ind}'].value
                 pl_letter_hlines = self.base_config_file_obj.planet_letters[pl_hlines_ind]
                 ax.hlines(per_hlines * per_mults, extent[0], extent[1], ls='--', lw=3, color='k')
