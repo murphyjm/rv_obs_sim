@@ -136,6 +136,8 @@ class SimGrid:
 
         ksim_grid = np.empty((len(self.moc_grid), len(self.nrv_grid), fit_post.model.num_planets))
         
+        # TODO: Clean up this big outer if else statement
+        # SYNTHETIC DATA
         if self.data_file is None:
             i = 0
             time_grid_inds = np.arange(self.max_baseline)
@@ -149,10 +151,12 @@ class SimGrid:
 
                     fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
                     fit_like = None
-
                     # TODO: Implement Composite likelihood objects so that these fits can be done with data from multiple instruments.
                     if hasattr(fit_config_file_obj, 'hnames') and len(fit_config_file_obj.hnames) > 0: # If it is a GP-enabled config file, use a GP likelihood
-                        fit_like = radvel.likelihood.GPLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
+                        tel = fit_config_file_obj.instnames[0] # HACK for single telescope data sets right now
+                        import pdb; pdb.set_trace()
+                        fit_like = radvel.likelihood.GPLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask], hnames=fit_config_file_obj.hnames[tel])
+                        
                     else:
                         fit_like = radvel.likelihood.RVLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
                     post = radvel.posterior.Posterior(fit_like)
@@ -168,6 +172,7 @@ class SimGrid:
                         post_grid[i, j] = post
 
                 i += 1
+        # REAL DATA
         else:
             time_range_mask = self.data['time'] > self.obs_start
             time_range_mask &= self.data['time'] < self.obs_end
@@ -190,7 +195,13 @@ class SimGrid:
                     
                     resampled_data = self.data.iloc[good_inds]
                     fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
-                    fit_like = radvel.likelihood.RVLikelihood(fit_mod, resampled_data.time, resampled_data.mnvel, resampled_data.errvel)
+                    fit_like = None
+                    # TODO: Implement Composite likelihood objects so that these fits can be done with data from multiple instruments.
+                    if hasattr(fit_config_file_obj, 'hnames') and len(fit_config_file_obj.hnames) > 0: # If it is a GP-enabled config file, use a GP likelihood
+                        tel = fit_config_file_obj.instnames[0] # HACK for single telescope data sets right now
+                        fit_like = radvel.likelihood.GPLikelihood(fit_mod, resampled_data.time, resampled_data.mnvel, resampled_data.errvel, hnames=fit_config_file_obj.hnames[tel])
+                    else:
+                        fit_like = radvel.likelihood.RVLikelihood(fit_mod, resampled_data.time, resampled_data.mnvel, resampled_data.errvel)
                     post = radvel.posterior.Posterior(fit_like)
                     post.priors += self.fit_config_file_obj.priors
                     post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
