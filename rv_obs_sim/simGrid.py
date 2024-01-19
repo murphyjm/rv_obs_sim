@@ -148,7 +148,13 @@ class SimGrid:
                     mask = moc_mask & (time_grid_inds / moc < nrv)
 
                     fit_mod = radvel.RVModel(fit_post.params, time_base=fit_config_file_obj.time_base)
-                    fit_like = radvel.likelihood.RVLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
+                    fit_like = None
+
+                    # TODO: Implement Composite likelihood objects so that these fits can be done with data from multiple instruments.
+                    if hasattr(fit_config_file_obj, 'hnames') and len(fit_config_file_obj.hnames) > 0: # If it is a GP-enabled config file, use a GP likelihood
+                        fit_like = radvel.likelihood.GPLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
+                    else:
+                        fit_like = radvel.likelihood.RVLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask])
                     post = radvel.posterior.Posterior(fit_like)
                     post.priors += self.fit_config_file_obj.priors
                     post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
