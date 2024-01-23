@@ -154,7 +154,6 @@ class SimGrid:
                     # TODO: Implement Composite likelihood objects so that these fits can be done with data from multiple instruments.
                     if hasattr(fit_config_file_obj, 'hnames') and len(fit_config_file_obj.hnames) > 0: # If it is a GP-enabled config file, use a GP likelihood
                         tel = fit_config_file_obj.instnames[0] # HACK for single telescope data sets right now
-                        import pdb; pdb.set_trace()
                         fit_like = radvel.likelihood.GPLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask], hnames=fit_config_file_obj.hnames[tel])
                         
                     else:
@@ -383,13 +382,13 @@ class SimGrid:
                                 ticks=bounds, 
                                 boundaries=bounds)
             if cbar_units == 'diff_over_sigma':
-                cbar_label = f'Planet {pl_letter}: $(K_\mathrm{{fit}} - K_\mathrm{{true}}) / \sigma_{{K_\mathrm{{true}}}}$'
+                cbar_label = f'Planet {pl_letter}: $(K_\mathrm{{fit}} - K_\mathrm{{baseline}}) / \sigma_{{K_\mathrm{{baseline}}}}$'
             elif cbar_units == 'ratio':
-                cbar_label = f'Planet {pl_letter}: $K_\mathrm{{fit}}/K_\mathrm{{true}}$'
+                cbar_label = f'Planet {pl_letter}: $K_\mathrm{{fit}}/K_\mathrm{{baseline}}$'
             cbar.set_label(cbar_label)
             cbar.ax.xaxis.set_label_position('bottom')
             cbar.ax.xaxis.set_ticks(cbar_xticks)
-            cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels)
+            cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels, fontdict={'fontsize':16})
 
             ax.set_xlabel('$N_\mathrm{rv}$')
             
