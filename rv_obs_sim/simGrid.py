@@ -388,7 +388,7 @@ class SimGrid:
             cbar.set_label(cbar_label)
             cbar.ax.xaxis.set_label_position('bottom')
             cbar.ax.xaxis.set_ticks(cbar_xticks)
-            cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels)
+            cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels, fontdict={'fontsize':16})
 
             ax.set_xlabel('$N_\mathrm{rv}$')
             
