@@ -154,7 +154,6 @@ class SimGrid:
                     # TODO: Implement Composite likelihood objects so that these fits can be done with data from multiple instruments.
                     if hasattr(fit_config_file_obj, 'hnames') and len(fit_config_file_obj.hnames) > 0: # If it is a GP-enabled config file, use a GP likelihood
                         tel = fit_config_file_obj.instnames[0] # HACK for single telescope data sets right now
-                        import pdb; pdb.set_trace()
                         fit_like = radvel.likelihood.GPLikelihood(fit_mod, self.time_grid[mask], self.mnvel_grid[mask], self.errvel_grid[mask], hnames=fit_config_file_obj.hnames[tel])
                         
                     else:
