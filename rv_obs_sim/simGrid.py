@@ -382,9 +382,9 @@ class SimGrid:
                                 ticks=bounds, 
                                 boundaries=bounds)
             if cbar_units == 'diff_over_sigma':
-                cbar_label = f'Planet {pl_letter}: $(K_\mathrm{{fit}} - K_\mathrm{{true}}) / \sigma_{{K_\mathrm{{true}}}}$'
+                cbar_label = f'Planet {pl_letter}: $(K_\mathrm{{fit}} - K_\mathrm{{Baseline}}) / \sigma_{{K_\mathrm{{Baseline}}}}$'
             elif cbar_units == 'ratio':
-                cbar_label = f'Planet {pl_letter}: $K_\mathrm{{fit}}/K_\mathrm{{true}}$'
+                cbar_label = f'Planet {pl_letter}: $K_\mathrm{{fit}}/K_\mathrm{{Baseline}}$'
             cbar.set_label(cbar_label)
             cbar.ax.xaxis.set_label_position('bottom')
             cbar.ax.xaxis.set_ticks(cbar_xticks)
