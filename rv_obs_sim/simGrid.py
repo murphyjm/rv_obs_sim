@@ -21,7 +21,8 @@ class SimGrid:
                  random_seed=42,
                  tel='hires_j', 
                  time_jitter=0, astro_rv_jitter=0, tel_rv_jitter=0, errvel_scale=2, 
-                 max_baseline=3650) -> None:
+                 max_baseline=3650,
+                 binning=False) -> None:
         
         self.sys_name = sys_name
         self.config_id = config_id
@@ -54,6 +55,9 @@ class SimGrid:
 
         self.max_baseline = max_baseline
 
+        # Whether or not to bin the RV data before fitting
+        self.binning = binning
+
     def __load_data(self,  **read_csv_kwargs):
 
         try:
@@ -67,13 +71,16 @@ class SimGrid:
 
         assert set(['time', 'mnvel','errvel', 'tel']).issubset(df.columns), "Data must have columns: 'time', 'mnvel', 'errvel', 'tel'."
         
-        data = pd.DataFrame()
-        bintime, binmnvel, binerrvel, bintel = radvel.utils.bintels(df.time.values, df.mnvel.values, df.errvel.values, df.tel.values, binsize=0.1)
-        data['time'] = bintime
-        data['mnvel'] = binmnvel
-        data['errvel'] = binerrvel
-        data['tel'] = bintel
-        self.data = data
+        if self.binning:
+            data = pd.DataFrame()
+            bintime, binmnvel, binerrvel, bintel = radvel.utils.bintels(df.time.values, df.mnvel.values, df.errvel.values, df.tel.values, binsize=0.1)
+            data['time'] = bintime
+            data['mnvel'] = binmnvel
+            data['errvel'] = binerrvel
+            data['tel'] = bintel
+            self.data = data
+        else:
+            self.data = df
 
         if self.obs_start is None:
             self.obs_start = np.min(self.data.time) - 1
