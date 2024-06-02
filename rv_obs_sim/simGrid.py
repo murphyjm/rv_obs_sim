@@ -39,6 +39,9 @@ class SimGrid:
         fit_config_file_obj, _ = radvel.utils.initialize_posterior(self.fit_config_file)
         self.fit_config_file_obj = fit_config_file_obj
 
+        # Whether or not to bin the RV data before fitting
+        self.binning = binning
+
         self.data_file = data_file
         self.obs_start, self.obs_end = obs_start_end
         if self.data_file is not None:
@@ -54,9 +57,6 @@ class SimGrid:
         self.errvel_scale = errvel_scale
 
         self.max_baseline = max_baseline
-
-        # Whether or not to bin the RV data before fitting
-        self.binning = binning
 
     def __load_data(self,  **read_csv_kwargs):
 
