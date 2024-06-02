@@ -56,7 +56,6 @@ class SimGrid:
         self.max_baseline = max_baseline
 
         # Whether or not to bin the RV data before fitting
-        import pdb; pdb.set_trace()
         self.binning = binning
 
     def __load_data(self,  **read_csv_kwargs):
