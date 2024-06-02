@@ -56,6 +56,7 @@ class SimGrid:
         self.max_baseline = max_baseline
 
         # Whether or not to bin the RV data before fitting
+        import pdb; pdb.set_trace()
         self.binning = binning
 
     def __load_data(self,  **read_csv_kwargs):
@@ -319,8 +320,12 @@ class SimGrid:
         fig_arr = np.empty(self.fit_config_file_obj.nplanets, dtype=object)
         axes_arr = np.empty((self.fit_config_file_obj.nplanets, 3), dtype=object)
 
+        nplanets = len(self.fit_config_file_obj.planet_letters.items())
+        fig, axes = plt.subplots(ncols=1, nrows=nplanets, figsize=(10, 8 * nplanets), sharex=True)
+        i = 0
         for pl_ind, pl_letter in self.fit_config_file_obj.planet_letters.items():
-            fig, ax = plt.subplots(figsize=(10, 8))
+            
+            ax = axes[i]
             px = (self.nrv_grid[-1] - self.nrv_grid[0]) / len(self.nrv_grid)
             py = (self.moc_grid[-1] - self.moc_grid[0]) / len(self.moc_grid)
             extent = [self.nrv_grid[0] - px/2, self.nrv_grid[-1] + px/2, self.moc_grid[0] - py/2, self.moc_grid[-1] + py/2]
@@ -382,22 +387,23 @@ class SimGrid:
                         annotate_str = f'$P_\mathrm{{{pl_letter_hlines}}} \\times {mult}$'
                     ax.text(extent[1] - 0.5, per_hlines * mult + 0.15, annotate_str, ha='right', va='bottom', fontsize=16)
 
-            cbar = fig.colorbar(im, ax=ax, orientation='horizontal', 
-                                norm=norm, 
-                                ticklocation='top', 
-                                spacing='proportional', 
-                                ticks=bounds, 
-                                boundaries=bounds)
-            if cbar_units == 'diff_over_sigma':
-                cbar_label = f'Planet {pl_letter}: $(K_\mathrm{{fit}} - K_\mathrm{{baseline}}) / \sigma_{{K_\mathrm{{baseline}}}}$'
-            elif cbar_units == 'ratio':
-                cbar_label = f'Planet {pl_letter}: $K_\mathrm{{fit}}/K_\mathrm{{baseline}}$'
-            cbar.set_label(cbar_label)
-            cbar.ax.xaxis.set_label_position('bottom')
-            cbar.ax.xaxis.set_ticks(cbar_xticks)
-            cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels, fontdict={'fontsize':16})
+            if i == nplanets - 1:
+                cbar = fig.colorbar(im, ax=ax, orientation='horizontal', 
+                                    norm=norm, 
+                                    ticklocation='top', 
+                                    spacing='proportional', 
+                                    ticks=bounds, 
+                                    boundaries=bounds)
+                if cbar_units == 'diff_over_sigma':
+                    cbar_label = f'Planet {pl_letter}: $(K_\mathrm{{fit}} - K_\mathrm{{baseline}}) / \sigma_{{K_\mathrm{{baseline}}}}$'
+                elif cbar_units == 'ratio':
+                    cbar_label = f'Planet {pl_letter}: $K_\mathrm{{fit}}/K_\mathrm{{baseline}}$'
+                cbar.set_label(cbar_label)
+                cbar.ax.xaxis.set_label_position('bottom')
+                cbar.ax.xaxis.set_ticks(cbar_xticks)
+                cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels, fontdict={'fontsize':16})
 
-            ax.set_xlabel('$N_\mathrm{rv}$')
+                ax.set_xlabel('$N_\mathrm{rv}$')
             
             xmin, xmax = ax.get_xlim()
             if self.data_file is not None:
@@ -437,7 +443,7 @@ class SimGrid:
             ax.set_title(f"{data_type} data: {self.sys_name}, {fname.split('_')[1] + ' ' + fname.split('_')[2]}")
 
             if savefig:
-                fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_planet_{pl_letter}_{cbar_units}{save_ext}'
+                fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_{cbar_units}{save_ext}'
                 save_fig_kwargs = {'bbox_inches':'tight'}
                 if save_ext == '.png':
                     save_fig_kwargs['dpi'] = save_dpi
@@ -446,5 +452,6 @@ class SimGrid:
             
             fig_arr[pl_ind - 1] = fig
             axes_arr[pl_ind - 1, :] = np.array([ax, ax2, cbar], dtype=object)
-            
+            i += 1
+
         return fig_arr, axes_arr
