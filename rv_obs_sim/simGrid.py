@@ -22,9 +22,14 @@ class SimGrid:
                  tel='hires_j', 
                  time_jitter=0, astro_rv_jitter=0, tel_rv_jitter=0, errvel_scale=2, 
                  max_baseline=3650,
-                 binning=False) -> None:
+                 binning=False,
+                 plot_title_name='') -> None:
         
         self.sys_name = sys_name
+        if plot_title_name != '':
+            self.plot_title_name = plot_title_name
+        else:
+            self.plot_title_name = sys_name
         self.config_id = config_id
 
         self.moc_grid = moc_grid
@@ -316,15 +321,16 @@ class SimGrid:
             norm = colors.BoundaryNorm(bounds, cmap.N)
             cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 1, 1.25, 1.50, 1.75, 2]
 
-        fig_arr = np.empty(self.fit_config_file_obj.nplanets, dtype=object)
-        axes_arr = np.empty((self.fit_config_file_obj.nplanets, 3), dtype=object)
-
         nplanets = len(self.fit_config_file_obj.planet_letters.items())
-        fig, axes = plt.subplots(ncols=1, nrows=nplanets, figsize=(10, 8 * nplanets), sharex=True)
-        i = 0
+        figsize = (10, 6 * nplanets)
+        fig, axes = plt.subplots(ncols=1, nrows=nplanets, figsize=figsize, sharex=True)
+        axis_ind = 0
         for pl_ind, pl_letter in self.fit_config_file_obj.planet_letters.items():
             
-            ax = axes[i]
+            if nplanets == 1:
+                ax = axes
+            else:
+                ax = axes[axis_ind]
             px = (self.nrv_grid[-1] - self.nrv_grid[0]) / len(self.nrv_grid)
             py = (self.moc_grid[-1] - self.moc_grid[0]) / len(self.moc_grid)
             extent = [self.nrv_grid[0] - px/2, self.nrv_grid[-1] + px/2, self.moc_grid[0] - py/2, self.moc_grid[-1] + py/2]
@@ -385,24 +391,6 @@ class SimGrid:
                     else:
                         annotate_str = f'$P_\mathrm{{{pl_letter_hlines}}} \\times {mult}$'
                     ax.text(extent[1] - 0.5, per_hlines * mult + 0.15, annotate_str, ha='right', va='bottom', fontsize=16)
-
-            if i == nplanets - 1:
-                cbar = fig.colorbar(im, ax=ax, orientation='horizontal', 
-                                    norm=norm, 
-                                    ticklocation='top', 
-                                    spacing='proportional', 
-                                    ticks=bounds, 
-                                    boundaries=bounds)
-                if cbar_units == 'diff_over_sigma':
-                    cbar_label = f'Planet {pl_letter}: $(K_\mathrm{{fit}} - K_\mathrm{{baseline}}) / \sigma_{{K_\mathrm{{baseline}}}}$'
-                elif cbar_units == 'ratio':
-                    cbar_label = f'Planet {pl_letter}: $K_\mathrm{{fit}}/K_\mathrm{{baseline}}$'
-                cbar.set_label(cbar_label)
-                cbar.ax.xaxis.set_label_position('bottom')
-                cbar.ax.xaxis.set_ticks(cbar_xticks)
-                cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels, fontdict={'fontsize':16})
-
-                ax.set_xlabel('$N_\mathrm{rv}$')
             
             xmin, xmax = ax.get_xlim()
             if self.data_file is not None:
@@ -436,21 +424,44 @@ class SimGrid:
             ax.set_ylabel(ylabel)
             ax.set_xlim(xmin, xmax)
             
-            # Make ticks go in
+            # Make ticks go in or out
             ax.tick_params(axis="x", direction="out", which="both", top=True, bottom=True)
             fname = self.fit_config_file.split('/')[-1]
-            ax.set_title(f"{data_type} data: {self.sys_name}, {fname.split('_')[1] + ' ' + fname.split('_')[2]}")
-
-            if savefig:
-                fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_{cbar_units}{save_ext}'
-                save_fig_kwargs = {'bbox_inches':'tight'}
-                if save_ext == '.png':
-                    save_fig_kwargs['dpi'] = save_dpi
-                    save_fig_kwargs['facecolor'] = 'white'
-                fig.savefig(fname, **save_fig_kwargs)
+            model_str = fname.split('_')[1]
+            if model_str == 'base':
+                model_str = 'baseline'
+            ax.text(0.5, 0.99, f"{self.plot_title_name} {pl_letter}\nModel: {model_str}", ha='center', va='top', transform=ax.transAxes, fontsize=16)
             
-            fig_arr[pl_ind - 1] = fig
-            axes_arr[pl_ind - 1, :] = np.array([ax, ax2, cbar], dtype=object)
-            i += 1
+            axis_ind += 1
 
-        return fig_arr, axes_arr
+        if nplanets > 1:
+            fig.subplots_adjust(hspace=0.05)
+            cbar_ax = fig.add_axes([0.1, 0.03, 0.85, 0.025])
+        else:
+            cbar_ax = fig.add_axes([0.1, -0.05, 0.85, 0.05])
+        cbar = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', 
+                                    norm=norm, 
+                                    ticklocation='bottom', 
+                                    spacing='proportional', 
+                                    ticks=bounds, 
+                                    boundaries=bounds)
+        if cbar_units == 'diff_over_sigma':
+            cbar_label = f'$(K_\mathrm{{fit}} - K_\mathrm{{baseline}}) / \sigma_{{K_\mathrm{{baseline}}}}$'
+        elif cbar_units == 'ratio':
+            cbar_label = f'$K_\mathrm{{fit}}/K_\mathrm{{baseline}}$'
+        cbar.set_label(cbar_label)
+        cbar.ax.xaxis.set_label_position('bottom')
+        cbar.ax.xaxis.set_ticks(cbar_xticks)
+        cbar.ax.xaxis.set_ticklabels(cbar_xtick_labels, fontdict={'fontsize':16})
+
+        ax.set_xlabel('$N_\mathrm{rv}$')
+        
+        if savefig:
+            fname = f'{self.sys_name}/{self.sys_name}_{save_id}_grid_{self.config_id}_config_{cbar_units}{save_ext}'
+            save_fig_kwargs = {'bbox_inches':'tight'}
+            if save_ext == '.png':
+                save_fig_kwargs['dpi'] = save_dpi
+                save_fig_kwargs['facecolor'] = 'white'
+            fig.savefig(fname, **save_fig_kwargs)
+
+        return fig, [axes, cbar]
