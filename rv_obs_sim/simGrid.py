@@ -271,8 +271,14 @@ class SimGrid:
                             continue
 
                     resampled_data = self.data.iloc[good_inds]
+                    resampled_fit_post_params = fit_post.params.copy()
+                    for param in fit_post.params.keys():
+                        if "gamma" in param or "jit" in param:
+                            if param.split("_")[-1] not in resampled_data.tel.unique():
+                                resampled_fit_post_params.pop(param)
                     fit_mod = radvel.RVModel(
-                        fit_post.params, time_base=fit_config_file_obj.time_base
+                        resampled_fit_post_params,
+                        time_base=fit_config_file_obj.time_base,
                     )
                     fit_like = None
 
@@ -294,7 +300,9 @@ class SimGrid:
                         if len(resampled_data.tel.unique()) > 1:
                             # Implementing functionality to fit with multiple instruments
                             # initialize Likelihood objects for each instrument
-                            iparams = radvel.basis._copy_params(fit_post.params)
+                            iparams = radvel.basis._copy_params(
+                                resampled_fit_post_params
+                            )
                             telgrps = resampled_data.groupby("tel").groups
                             likes = {}
 
@@ -323,8 +331,25 @@ class SimGrid:
                                 resampled_data.mnvel,
                                 resampled_data.errvel,
                             )
+
                     post = radvel.posterior.Posterior(fit_like)
-                    post.priors += self.fit_config_file_obj.priors
+                    import pdb
+
+                    pdb.set_trace()
+                    resampled_fit_priors = []
+                    for prior in self.fit_config_file_obj.priors:
+                        try:
+                            param_name = prior["param"]
+                            if "gamma" in param_name or "jit" in param_name:
+                                if (
+                                    param_name.split("_")[-1]
+                                    not in resampled_data.tel.unique()
+                                ):
+                                    continue
+                        except KeyError:
+                            pass
+                        resampled_fit_priors.append(prior)
+                    post.priors += resampled_fit_priors
                     post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
                     planet_letter_keys = list(fit_config_file_obj.planet_letters.keys())
                     k_maps = np.array(
