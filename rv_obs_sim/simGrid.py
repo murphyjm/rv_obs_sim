@@ -272,7 +272,7 @@ class SimGrid:
                         else:
                             continue
 
-                    resampled_data = self.data.iloc[good_inds]
+                    resampled_data = self.data.iloc[good_inds].reset_index(drop=True)
                     resampled_fit_post_params = copy.deepcopy(fit_post.params)
                     for param in fit_post.params.keys():
                         if "gamma" in param or "jit" in param:
