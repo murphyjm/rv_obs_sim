@@ -7,6 +7,8 @@ from radvel.plot import orbit_plots
 from tqdm import tqdm
 
 rcParams["font.size"] = 14
+import copy
+
 from matplotlib import colors
 from matplotlib.ticker import MultipleLocator
 
@@ -271,7 +273,7 @@ class SimGrid:
                             continue
 
                     resampled_data = self.data.iloc[good_inds]
-                    resampled_fit_post_params = fit_post.params.copy()
+                    resampled_fit_post_params = copy.deepcopy(fit_post.params)
                     for param in fit_post.params.keys():
                         if "gamma" in param or "jit" in param:
                             if param.split("_")[-1] not in resampled_data.tel.unique():
@@ -334,22 +336,24 @@ class SimGrid:
                             )
 
                     post = radvel.posterior.Posterior(fit_like)
-                    import pdb
-
-                    pdb.set_trace()
                     resampled_fit_priors = []
                     for prior in self.fit_config_file_obj.priors:
                         try:
-                            param_name = prior["param"]
+                            param_name = prior.param
                             if "gamma" in param_name or "jit" in param_name:
                                 if (
                                     param_name.split("_")[-1]
                                     not in resampled_data.tel.unique()
                                 ):
                                     continue
-                        except KeyError:
+                                else:
+                                    resampled_fit_priors.append(prior)
+                            else:
+                                resampled_fit_priors.append(prior)
+                        except AttributeError:
+                            resampled_fit_priors.append(prior)
                             pass
-                        resampled_fit_priors.append(prior)
+
                     post.priors += resampled_fit_priors
                     post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
                     planet_letter_keys = list(fit_config_file_obj.planet_letters.keys())
