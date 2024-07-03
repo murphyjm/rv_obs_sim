@@ -7,6 +7,8 @@ from radvel.plot import orbit_plots
 from tqdm import tqdm
 
 rcParams["font.size"] = 14
+import copy
+
 from matplotlib import colors
 from matplotlib.ticker import MultipleLocator
 
@@ -270,8 +272,8 @@ class SimGrid:
                         else:
                             continue
 
-                    resampled_data = self.data.iloc[good_inds]
-                    resampled_fit_post_params = fit_post.params.copy()
+                    resampled_data = self.data.iloc[good_inds].reset_index(drop=True)
+                    resampled_fit_post_params = copy.deepcopy(fit_post.params)
                     for param in fit_post.params.keys():
                         if "gamma" in param or "jit" in param:
                             if param.split("_")[-1] not in resampled_data.tel.unique():
@@ -334,22 +336,24 @@ class SimGrid:
                             )
 
                     post = radvel.posterior.Posterior(fit_like)
-                    import pdb
-
-                    pdb.set_trace()
                     resampled_fit_priors = []
                     for prior in self.fit_config_file_obj.priors:
                         try:
-                            param_name = prior["param"]
+                            param_name = prior.param
                             if "gamma" in param_name or "jit" in param_name:
                                 if (
                                     param_name.split("_")[-1]
                                     not in resampled_data.tel.unique()
                                 ):
                                     continue
-                        except KeyError:
+                                else:
+                                    resampled_fit_priors.append(prior)
+                            else:
+                                resampled_fit_priors.append(prior)
+                        except AttributeError:
+                            resampled_fit_priors.append(prior)
                             pass
-                        resampled_fit_priors.append(prior)
+
                     post.priors += resampled_fit_priors
                     post = radvel.fitting.maxlike_fitting(post, verbose=verbose)
                     planet_letter_keys = list(fit_config_file_obj.planet_letters.keys())
@@ -475,10 +479,14 @@ class SimGrid:
             cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 1, 1.25, 1.50, 1.75, 2]
 
         nplanets = len(self.fit_config_file_obj.planet_letters.items())
+        planet_dict = self.fit_config_file_obj.planet_letters.items()
+        if self.plot_title_name == "HD 119130":
+            nplanets = 1
+            planet_dict = {1: "b"}.items()
         figsize = (10, 6 * nplanets)
         fig, axes = plt.subplots(ncols=1, nrows=nplanets, figsize=figsize, sharex=True)
         axis_ind = 0
-        for pl_ind, pl_letter in self.fit_config_file_obj.planet_letters.items():
+        for pl_ind, pl_letter in planet_dict:
 
             if nplanets == 1:
                 ax = axes
@@ -515,8 +523,8 @@ class SimGrid:
             ax2 = ax.twinx()
             ax2.set_ylim(extent[2] / per_twin, extent[3] / per_twin)
             if per_twin > np.max(self.moc_grid):
-                ax2.yaxis.set_major_locator(MultipleLocator(0.005))
-                ax2.yaxis.set_minor_locator(MultipleLocator(0.001))
+                ax2.yaxis.set_major_locator(MultipleLocator(0.05))
+                ax2.yaxis.set_minor_locator(MultipleLocator(0.025))
             elif per_twin < 1:
                 ax2.yaxis.set_major_locator(MultipleLocator(5))
                 ax2.yaxis.set_minor_locator(MultipleLocator(1))
@@ -529,7 +537,10 @@ class SimGrid:
                 labelpad=25,
             )
 
-            if self.base_post.model.num_planets > 1:
+            if (
+                self.base_post.model.num_planets > 1
+                and self.plot_title_name != "HD 119130"
+            ):
                 pl_hlines_ind = None
                 per_mults = None
                 if pl_ind == 1:
@@ -542,6 +553,8 @@ class SimGrid:
                     pl_hlines_ind = pl_ind - 1
                     if self.base_post.params[f"per{pl_hlines_ind}"].value < 1:
                         per_mults = np.array([1, 10])
+                    elif self.base_post.params[f"per{pl_hlines_ind}"].value > 15:
+                        per_mults = np.array([0.5, 1])
                     else:
                         per_mults = np.array([0.5, 1, 2])
                 per_hlines = self.base_post.params[f"per{pl_hlines_ind}"].value
@@ -619,15 +632,26 @@ class SimGrid:
             model_str = fname.split("_")[1]
             if model_str == "base":
                 model_str = "baseline"
-            ax.text(
-                0.5,
-                0.99,
-                f"{self.plot_title_name} {pl_letter}\nModel: {model_str}",
-                ha="center",
-                va="top",
-                transform=ax.transAxes,
-                fontsize=16,
-            )
+            if f"{self.plot_title_name} {pl_letter}" == "HD 119130 c":
+                ax.text(
+                    0.5,
+                    0.99,
+                    f"Signal c\nModel: {model_str}",
+                    ha="center",
+                    va="top",
+                    transform=ax.transAxes,
+                    fontsize=16,
+                )
+            else:
+                ax.text(
+                    0.5,
+                    0.99,
+                    f"{self.plot_title_name} {pl_letter}\nModel: {model_str}",
+                    ha="center",
+                    va="top",
+                    transform=ax.transAxes,
+                    fontsize=16,
+                )
 
             axis_ind += 1
 
