@@ -479,10 +479,14 @@ class SimGrid:
             cbar_xtick_labels = [0, 0.25, 0.50, 0.75, 1, 1.25, 1.50, 1.75, 2]
 
         nplanets = len(self.fit_config_file_obj.planet_letters.items())
+        planet_dict = self.fit_config_file_obj.planet_letters.items()
+        if self.plot_title_name == "HD 119130":
+            nplanets = 1
+            planet_dict = {1: "b"}.items()
         figsize = (10, 6 * nplanets)
         fig, axes = plt.subplots(ncols=1, nrows=nplanets, figsize=figsize, sharex=True)
         axis_ind = 0
-        for pl_ind, pl_letter in self.fit_config_file_obj.planet_letters.items():
+        for pl_ind, pl_letter in planet_dict:
 
             if nplanets == 1:
                 ax = axes
@@ -519,8 +523,8 @@ class SimGrid:
             ax2 = ax.twinx()
             ax2.set_ylim(extent[2] / per_twin, extent[3] / per_twin)
             if per_twin > np.max(self.moc_grid):
-                ax2.yaxis.set_major_locator(MultipleLocator(0.005))
-                ax2.yaxis.set_minor_locator(MultipleLocator(0.001))
+                ax2.yaxis.set_major_locator(MultipleLocator(0.05))
+                ax2.yaxis.set_minor_locator(MultipleLocator(0.025))
             elif per_twin < 1:
                 ax2.yaxis.set_major_locator(MultipleLocator(5))
                 ax2.yaxis.set_minor_locator(MultipleLocator(1))
@@ -533,7 +537,10 @@ class SimGrid:
                 labelpad=25,
             )
 
-            if self.base_post.model.num_planets > 1:
+            if (
+                self.base_post.model.num_planets > 1
+                and self.plot_title_name != "HD 119130"
+            ):
                 pl_hlines_ind = None
                 per_mults = None
                 if pl_ind == 1:
@@ -546,6 +553,8 @@ class SimGrid:
                     pl_hlines_ind = pl_ind - 1
                     if self.base_post.params[f"per{pl_hlines_ind}"].value < 1:
                         per_mults = np.array([1, 10])
+                    elif self.base_post.params[f"per{pl_hlines_ind}"].value > 15:
+                        per_mults = np.array([0.5, 1])
                     else:
                         per_mults = np.array([0.5, 1, 2])
                 per_hlines = self.base_post.params[f"per{pl_hlines_ind}"].value
@@ -623,15 +632,26 @@ class SimGrid:
             model_str = fname.split("_")[1]
             if model_str == "base":
                 model_str = "baseline"
-            ax.text(
-                0.5,
-                0.99,
-                f"{self.plot_title_name} {pl_letter}\nModel: {model_str}",
-                ha="center",
-                va="top",
-                transform=ax.transAxes,
-                fontsize=16,
-            )
+            if f"{self.plot_title_name} {pl_letter}" == "HD 119130 c":
+                ax.text(
+                    0.5,
+                    0.99,
+                    f"Signal c\nModel: {model_str}",
+                    ha="center",
+                    va="top",
+                    transform=ax.transAxes,
+                    fontsize=16,
+                )
+            else:
+                ax.text(
+                    0.5,
+                    0.99,
+                    f"{self.plot_title_name} {pl_letter}\nModel: {model_str}",
+                    ha="center",
+                    va="top",
+                    transform=ax.transAxes,
+                    fontsize=16,
+                )
 
             axis_ind += 1
 
