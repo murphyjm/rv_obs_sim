@@ -276,6 +276,9 @@ class SimGrid:
                         if "gamma" in param or "jit" in param:
                             if param.split("_")[-1] not in resampled_data.tel.unique():
                                 resampled_fit_post_params.pop(param)
+                    import pdb
+
+                    pdb.set_trace()
                     fit_mod = radvel.RVModel(
                         resampled_fit_post_params,
                         time_base=fit_config_file_obj.time_base,
