@@ -213,7 +213,6 @@ class SimGrid:
                         fit_post.params, time_base=fit_config_file_obj.time_base
                     )
                     fit_like = None
-                    # TODO: Implement Composite likelihood objects so that these fits can be done with data from multiple instruments.
                     if (
                         hasattr(fit_config_file_obj, "hnames")
                         and len(fit_config_file_obj.hnames) > 0

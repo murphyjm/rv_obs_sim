@@ -1,9 +1,8 @@
-python==3.11.9
-numpy==1.24.4
-matplotlib==3.7.3
+numpy==1.24.3
+matplotlib==3.8.0
 scipy==1.10.1
-pandas==2.0.3
-radvel==1.3.8
-rvsearch==0.3.3
-tqdm==4.66.1
+pandas==2.1.1
+radvel==1.4.11
+tqdm==4.65.0
 jupyter==1.0.0
+h5py==3.9.0
