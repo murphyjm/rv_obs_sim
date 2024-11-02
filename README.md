@@ -1,3 +1,6 @@
+If you make use of this code in your own research, please cite [![DOI](https://zenodo.org/badge/668856869.svg)](https://doi.org/10.5281/zenodo.14029420)
+and Akana Murphy et al. (2024).
+
 # Simulate RV observations by either resampling real data or creating synthetic data
 
 There are some quirks in the package dependencies for the resampling experiments
